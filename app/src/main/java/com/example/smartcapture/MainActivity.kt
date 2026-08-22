@@ -26,6 +26,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Bundle
 import android.text.InputType
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -34,6 +36,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.graphics.drawable.GradientDrawable
 import android.app.AlertDialog
@@ -498,11 +501,18 @@ class MainActivity : ComponentActivity() {
 
     private fun showLoginScreen() {
 
-        val layout = LinearLayout(this).apply {
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(28), dp(56), dp(28), dp(28))
             setBackgroundColor(ink)
             gravity = android.view.Gravity.CENTER
+        }
+
+        val layout = ScrollView(this).apply {
+            setFillViewport(true)
+            isVerticalScrollBarEnabled = false
+            setBackgroundColor(ink)
+            addView(content)
         }
 
         val title = TextView(this).apply {
@@ -525,6 +535,12 @@ class MainActivity : ComponentActivity() {
             EditText(this).apply {
 
                 hint = "Staff ID"
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = dp(8)
+                }
 
                 inputType =
                     InputType.TYPE_CLASS_TEXT
@@ -534,15 +550,22 @@ class MainActivity : ComponentActivity() {
             EditText(this).apply {
 
                 hint = "Password"
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(8)
+                }
 
                 inputType =
                     InputType.TYPE_CLASS_TEXT or
                             InputType.TYPE_TEXT_VARIATION_PASSWORD
+                transformationMethod = PasswordTransformationMethod.getInstance()
 
                 setCompoundDrawablesWithIntrinsicBounds(
                     0,
                     0,
-                    android.R.drawable.ic_menu_view,
+                    R.drawable.ic_visibility_off,
                     0
                 )
 
@@ -550,28 +573,28 @@ class MainActivity : ComponentActivity() {
 
                     if (
                         event.action == MotionEvent.ACTION_UP &&
-                        event.x >=
-                        width - compoundDrawablePadding - 100
+                        event.x >= width - totalPaddingRight
                     ) {
 
-                        val visible =
-                            inputType ==
-                                    (
-                                            InputType.TYPE_CLASS_TEXT or
-                                                    InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-                                            )
+                        val visible = transformationMethod == null
 
                         if (visible) {
-
-                            inputType =
-                                InputType.TYPE_CLASS_TEXT or
-                                        InputType.TYPE_TEXT_VARIATION_PASSWORD
+                            transformationMethod = PasswordTransformationMethod.getInstance()
+                            setCompoundDrawablesWithIntrinsicBounds(
+                                0,
+                                0,
+                                R.drawable.ic_visibility_off,
+                                0
+                            )
 
                         } else {
-
-                            inputType =
-                                InputType.TYPE_CLASS_TEXT or
-                                        InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                            transformationMethod = HideReturnsTransformationMethod.getInstance()
+                            setCompoundDrawablesWithIntrinsicBounds(
+                                0,
+                                0,
+                                R.drawable.ic_visibility,
+                                0
+                            )
                         }
 
                         setSelection(text.length)
@@ -653,12 +676,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-        layout.addView(title)
-        layout.addView(information)
-        layout.addView(staffIdInput)
-        layout.addView(passwordInput)
-        layout.addView(loginStatus)
-        layout.addView(loginButton)
+        content.addView(title)
+        content.addView(information)
+        content.addView(staffIdInput)
+        content.addView(passwordInput)
+        content.addView(loginStatus)
+        content.addView(loginButton)
 
         setContentView(layout)
     }
@@ -877,6 +900,9 @@ class MainActivity : ComponentActivity() {
 
                         if (result?.success == true) {
 
+                            uploadInProgress = false
+                            capturedImageFile?.delete()
+                            capturedImageFile = null
                             showUploadCompleteDialog()
 
                         } else {
@@ -1447,6 +1473,7 @@ class MainActivity : ComponentActivity() {
     // DOCUMENT / PHOTO CAMERA
     // --------------------------------------------------------- 
     fun startDocumentCamera() { 
+        uploadInProgress = false
         val documentCamera =
             DocumentCamera(
                 activity = this,

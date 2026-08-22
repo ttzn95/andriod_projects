@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.example.smartcapture.app-debug-37:/drawable_ic_visibility_off.xml.flat",
+        "source": "com.example.smartcapture.app-main-39:/drawable/ic_visibility_off.xml"
+    },
+    {
+        "merged": "com.example.smartcapture.app-debug-37:/drawable_ic_visibility.xml.flat",
+        "source": "com.example.smartcapture.app-main-39:/drawable/ic_visibility.xml"
+    }
+]

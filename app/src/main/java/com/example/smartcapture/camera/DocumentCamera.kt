@@ -35,7 +35,12 @@ class DocumentCamera(
     var imageCapture: ImageCapture? = null
         private set
 
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var isActive = false
+
     fun start() {
+
+        isActive = true
 
         val rootLayout =
             LinearLayout(activity).apply {
@@ -213,6 +218,7 @@ class DocumentCamera(
         val cancelButton =
             activity.createCameraButton("Cancel") {
 
+                stopCamera()
                 onCancelRequested()
             }
 
@@ -248,8 +254,14 @@ class DocumentCamera(
 
         cameraProviderFuture.addListener({
 
-            val cameraProvider =
+            val provider =
                 cameraProviderFuture.get()
+
+            if (!isActive) {
+                return@addListener
+            }
+
+            cameraProvider = provider
 
             val preview =
                 Preview.Builder()
@@ -275,9 +287,9 @@ class DocumentCamera(
 
             try {
 
-                cameraProvider.unbindAll()
+                provider.unbindAll()
 
-                cameraProvider.bindToLifecycle(
+                provider.bindToLifecycle(
                     activity,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
@@ -354,6 +366,7 @@ class DocumentCamera(
                         ImageCapture.OutputFileResults
                 ) {
 
+                    stopCamera()
                     onImageCaptured(file)
                 }
 
@@ -368,5 +381,12 @@ class DocumentCamera(
                 }
             }
         )
+    }
+
+    fun stopCamera() {
+        isActive = false
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        imageCapture = null
     }
 }

@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-24:12
-INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-24:12
-INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-24:12
-INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-24:12
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-25:12
+INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-25:12
+INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-25:12
+INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:2:1-25:12
 MERGED from [androidx.activity:activity-ktx:1.10.1] /home/codespace/.gradle/caches/8.11.1/transforms/055ab4913d22c0806344749c33b60899/transformed/jetified-activity-ktx-1.10.1/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.camera:camera-video:1.4.2] /home/codespace/.gradle/caches/8.11.1/transforms/7ffbfa41d30adef96490478f2c0e1b30/transformed/jetified-camera-video-1.4.2/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.camera:camera-core:1.4.2] /home/codespace/.gradle/caches/8.11.1/transforms/2bceac8e0ac92b9790682aa12e5f4607/transformed/jetified-camera-core-1.4.2/AndroidManifest.xml:17:1-36:12
@@ -79,8 +79,8 @@ MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home
 	android:name
 		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:4:22-64
 application
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:5:5-22:19
-INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:5:5-22:19
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:5:5-23:19
+INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:5:5-23:19
 MERGED from [androidx.camera:camera-core:1.4.2] /home/codespace/.gradle/caches/8.11.1/transforms/2bceac8e0ac92b9790682aa12e5f4607/transformed/jetified-camera-core-1.4.2/AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-core:1.4.2] /home/codespace/.gradle/caches/8.11.1/transforms/2bceac8e0ac92b9790682aa12e5f4607/transformed/jetified-camera-core-1.4.2/AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-camera2:1.4.2] /home/codespace/.gradle/caches/8.11.1/transforms/c8059c19b271ace16c620b8c20dd09d1/transformed/jetified-camera-camera2-1.4.2/AndroidManifest.xml:23:5-34:19
@@ -128,21 +128,23 @@ MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/codespace/.gradle/
 	android:theme
 		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:9:9-50
 activity#com.example.smartcapture.MainActivity
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:11:9-20:20
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:11:9-21:20
 	android:exported
 		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:13:13-36
+	android:configChanges
+		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:14:13-74
 	android:name
 		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:12:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:15:13-18:29
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:16:13-19:29
 action#android.intent.action.MAIN
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:16:17-69
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:17:17-69
 	android:name
-		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:16:25-66
+		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:17:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:17:17-77
+ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:18:17-77
 	android:name
-		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:17:27-74
+		ADDED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml:18:27-74
 uses-sdk
 INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /workspaces/andriod_projects/app/src/main/AndroidManifest.xml

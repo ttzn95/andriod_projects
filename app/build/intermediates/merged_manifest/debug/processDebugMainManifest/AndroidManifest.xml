@@ -29,6 +29,7 @@
         android:theme="@style/Theme.SmartCapture" >
         <activity
             android:name="com.example.smartcapture.MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

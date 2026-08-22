@@ -4,11 +4,14 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.InputType
+import android.text.method.PasswordTransformationMethod
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -17,41 +20,57 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+
 import com.example.smartcapture.api.ApiClient
 import com.example.smartcapture.api.LoginRequest
+
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+
 import java.util.concurrent.Executors
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var previewView: PreviewView
     private lateinit var statusText: TextView
 
-    private val cameraExecutor = Executors.newSingleThreadExecutor()
+    private val cameraExecutor =
+        Executors.newSingleThreadExecutor()
 
     /*
+     * Session token returned/generated during QR session.
+     *
      * IMPORTANT:
+     * Keep this only in memory.
      *
-     * Keep the session token only in memory.
-     *
-     * Do NOT save it to SharedPreferences,
-     * files, gallery, or database.
+     * Do NOT save it to:
+     * - SharedPreferences
+     * - files
+     * - database
+     * - gallery
      */
     private var sessionToken: String? = null
 
     /*
-     * Capture token returned by backend after successful login.
+     * Capture token returned by backend after
+     * successful staff authentication.
      *
-     * Also kept only in memory for now.
+     * Keep this only in memory.
      */
     private var captureToken: String? = null
+
+
+    // ---------------------------------------------------------
+    // CAMERA PERMISSION
+    // ---------------------------------------------------------
 
     private val cameraPermissionLauncher =
         registerForActivityResult(
@@ -59,17 +78,28 @@ class MainActivity : ComponentActivity() {
         ) { granted ->
 
             if (granted) {
+
                 startQrScanner()
+
             } else {
-                statusText.text = "Camera permission is required."
+
+                statusText.text =
+                    "Camera permission is required."
             }
         }
 
+
+    // ---------------------------------------------------------
+    // ACTIVITY
+    // ---------------------------------------------------------
+
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
 
         showMainScreen()
     }
+
 
     // ---------------------------------------------------------
     // MAIN SCREEN
@@ -77,36 +107,73 @@ class MainActivity : ComponentActivity() {
 
     private fun showMainScreen() {
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
-        }
+        val layout =
+            LinearLayout(this).apply {
 
-        val title = TextView(this).apply {
-            text = "Smart Capture"
-            textSize = 28f
-        }
+                orientation =
+                    LinearLayout.VERTICAL
 
-        statusText = TextView(this).apply {
-            text = "Ready"
-            textSize = 18f
-            setPadding(0, 40, 0, 40)
-        }
-
-        val scanButton = Button(this).apply {
-            text = "Scan QR Code"
-
-            setOnClickListener {
-                requestCameraPermission()
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
             }
-        }
+
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Smart Capture"
+
+                textSize =
+                    28f
+            }
+
+
+        statusText =
+            TextView(this).apply {
+
+                text =
+                    "Ready"
+
+                textSize =
+                    18f
+
+                setPadding(
+                    0,
+                    40,
+                    0,
+                    40
+                )
+            }
+
+
+        val scanButton =
+            Button(this).apply {
+
+                text =
+                    "Scan QR Code"
+
+                setOnClickListener {
+
+                    requestCameraPermission()
+                }
+            }
+
 
         layout.addView(title)
+
         layout.addView(statusText)
+
         layout.addView(scanButton)
+
 
         setContentView(layout)
     }
+
 
     // ---------------------------------------------------------
     // CAMERA PERMISSION
@@ -118,9 +185,12 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
+            ) ==
+            PackageManager.PERMISSION_GRANTED
         ) {
+
             startQrScanner()
+
         } else {
 
             cameraPermissionLauncher.launch(
@@ -129,23 +199,42 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
     // ---------------------------------------------------------
     // QR SCANNER
     // ---------------------------------------------------------
 
     private fun startQrScanner() {
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val layout =
+            LinearLayout(this).apply {
 
-        previewView = PreviewView(this)
+                orientation =
+                    LinearLayout.VERTICAL
+            }
 
-        val scannerStatus = TextView(this).apply {
-            text = "Point the camera at the DMS QR code"
-            textSize = 18f
-            setPadding(20, 20, 20, 20)
-        }
+
+        previewView =
+            PreviewView(this)
+
+
+        val scannerStatus =
+            TextView(this).apply {
+
+                text =
+                    "Point the camera at the DMS QR code"
+
+                textSize =
+                    18f
+
+                setPadding(
+                    20,
+                    20,
+                    20,
+                    20
+                )
+            }
+
 
         layout.addView(
             previewView,
@@ -156,6 +245,7 @@ class MainActivity : ComponentActivity() {
             )
         )
 
+
         layout.addView(
             scannerStatus,
             LinearLayout.LayoutParams(
@@ -164,21 +254,29 @@ class MainActivity : ComponentActivity() {
             )
         )
 
+
         setContentView(layout)
+
 
         val cameraProviderFuture =
             ProcessCameraProvider.getInstance(this)
 
+
         cameraProviderFuture.addListener({
 
-            val cameraProvider = cameraProviderFuture.get()
+            val cameraProvider =
+                cameraProviderFuture.get()
 
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.surfaceProvider =
-                        previewView.surfaceProvider
-                }
+
+            val preview =
+                Preview.Builder()
+                    .build()
+                    .also {
+
+                        it.surfaceProvider =
+                            previewView.surfaceProvider
+                    }
+
 
             val options =
                 BarcodeScannerOptions.Builder()
@@ -187,30 +285,43 @@ class MainActivity : ComponentActivity() {
                     )
                     .build()
 
+
             val scanner =
-                BarcodeScanning.getClient(options)
+                BarcodeScanning.getClient(
+                    options
+                )
+
 
             val imageAnalysis =
                 ImageAnalysis.Builder()
                     .setBackpressureStrategy(
-                        ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                        ImageAnalysis
+                            .STRATEGY_KEEP_ONLY_LATEST
                     )
                     .build()
+
 
             imageAnalysis.setAnalyzer(
                 cameraExecutor
             ) { imageProxy ->
 
-                val mediaImage = imageProxy.image
+                val mediaImage =
+                    imageProxy.image
+
 
                 if (mediaImage != null) {
 
-                    val image = InputImage.fromMediaImage(
-                        mediaImage,
-                        imageProxy.imageInfo.rotationDegrees
-                    )
+                    val image =
+                        InputImage.fromMediaImage(
+                            mediaImage,
+                            imageProxy
+                                .imageInfo
+                                .rotationDegrees
+                        )
+
 
                     scanner.process(image)
+
                         .addOnSuccessListener { barcodes ->
 
                             for (barcode in barcodes) {
@@ -218,40 +329,55 @@ class MainActivity : ComponentActivity() {
                                 val value =
                                     barcode.rawValue
 
-                                if (!value.isNullOrBlank()) {
+
+                                if (
+                                    !value.isNullOrBlank()
+                                ) {
 
                                     /*
-                                     * Stop scanning immediately.
+                                     * Stop scanning.
                                      */
-                                    imageAnalysis.clearAnalyzer()
+                                    imageAnalysis
+                                        .clearAnalyzer()
+
 
                                     runOnUiThread {
 
                                         /*
-                                         * DO NOT DISPLAY THE TOKEN.
+                                         * Never display
+                                         * the session token.
                                          */
                                         scannerStatus.text =
                                             "QR detected. Validating session..."
 
-                                        handleQrCode(value)
+
+                                        handleQrCode(
+                                            value
+                                        )
                                     }
+
 
                                     break
                                 }
                             }
                         }
+
                         .addOnCompleteListener {
+
                             imageProxy.close()
                         }
 
                 } else {
+
                     imageProxy.close()
                 }
             }
 
+
             try {
 
                 cameraProvider.unbindAll()
+
 
                 cameraProvider.bindToLifecycle(
                     this,
@@ -269,29 +395,30 @@ class MainActivity : ComponentActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+
     // ---------------------------------------------------------
     // HANDLE QR
     // ---------------------------------------------------------
 
-    private fun handleQrCode(qrValue: String) {
+    private fun handleQrCode(
+        qrValue: String
+    ) {
 
         /*
-         * For our first prototype, the QR contains
-         * the session token directly.
+         * Prototype:
          *
-         * Later we can make the QR a signed payload such as:
+         * QR contains the session token directly.
          *
-         * {
-         *   "session_id": "...",
-         *   "nonce": "...",
-         *   "expires_at": "..."
-         * }
+         * Later we will use a signed QR payload.
          */
 
-        sessionToken = qrValue
+        sessionToken =
+            qrValue
+
 
         showLoginScreen()
     }
+
 
     // ---------------------------------------------------------
     // STAFF LOGIN SCREEN
@@ -299,99 +426,228 @@ class MainActivity : ComponentActivity() {
 
     private fun showLoginScreen() {
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
-        }
+        val layout =
+            LinearLayout(this).apply {
 
-        val title = TextView(this).apply {
-            text = "Staff Login"
-            textSize = 28f
-        }
+                orientation =
+                    LinearLayout.VERTICAL
 
-        val information = TextView(this).apply {
-            text = "Enter your staff credentials"
-            textSize = 17f
-            setPadding(0, 30, 0, 30)
-        }
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
+            }
 
-        val staffIdInput = EditText(this).apply {
-            hint = "Staff ID"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
 
-        val passwordInput = EditText(this).apply {
-    hint = "Password"
-    inputType =
-        InputType.TYPE_CLASS_TEXT or
-        InputType.TYPE_TEXT_VARIATION_PASSWORD
+        val title =
+            TextView(this).apply {
 
-    setCompoundDrawablesWithIntrinsicBounds(
-        0,
-        0,
-        android.R.drawable.ic_menu_view,
-        0
-    )
+                text =
+                    "Staff Login"
 
-    setOnTouchListener { _, event ->
+                textSize =
+                    28f
+            }
 
-        if (
-            event.action == android.view.MotionEvent.ACTION_UP &&
-            event.x >= (width - compoundDrawablePadding - 80)
-        ) {
 
-            val isPasswordVisible =
-                inputType ==
-                    (InputType.TYPE_CLASS_TEXT or
-                     InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+        val information =
+            TextView(this).apply {
 
-            if (isPasswordVisible) {
+                text =
+                    "Enter your staff credentials"
+
+                textSize =
+                    17f
+
+                setPadding(
+                    0,
+                    30,
+                    0,
+                    30
+                )
+            }
+
+
+        // -----------------------------------------------------
+        // STAFF ID
+        // -----------------------------------------------------
+
+        val staffIdInput =
+            EditText(this).apply {
+
+                hint =
+                    "Staff ID"
+
+                inputType =
+                    InputType.TYPE_CLASS_TEXT
+            }
+
+
+        // -----------------------------------------------------
+        // PASSWORD
+        // -----------------------------------------------------
+
+        val passwordInput =
+            EditText(this).apply {
+
+                hint =
+                    "Password"
 
                 inputType =
                     InputType.TYPE_CLASS_TEXT or
                     InputType.TYPE_TEXT_VARIATION_PASSWORD
 
-            } else {
 
-                inputType =
-                    InputType.TYPE_CLASS_TEXT or
-                    InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                /*
+                 * Use Android's built-in eye icon.
+                 */
+                setCompoundDrawablesWithIntrinsicBounds(
+                    0,
+                    0,
+                    android.R.drawable.ic_menu_view,
+                    0
+                )
+
+
+                /*
+                 * Add spacing between text and icon.
+                 */
+                compoundDrawablePadding =
+                    16
+
+
+                /*
+                 * Handle tapping the eye icon.
+                 */
+                setOnTouchListener { _, event ->
+
+                    if (
+                        event.action ==
+                        MotionEvent.ACTION_UP
+                    ) {
+
+                        val drawable =
+                            compoundDrawables[2]
+
+
+                        if (drawable != null) {
+
+                            val drawableWidth =
+                                drawable.intrinsicWidth
+
+
+                            val drawableStart =
+                                width -
+                                paddingRight -
+                                drawableWidth
+
+
+                            /*
+                             * Give the icon a generous
+                             * touch area.
+                             */
+                            if (
+                                event.x >=
+                                drawableStart - 80
+                            ) {
+
+                                if (
+                                    transformationMethod ==
+                                    null
+                                ) {
+
+                                    /*
+                                     * Password is currently
+                                     * visible.
+                                     *
+                                     * Hide it.
+                                     */
+                                    transformationMethod =
+                                        PasswordTransformationMethod
+                                            .getInstance()
+
+                                } else {
+
+                                    /*
+                                     * Password is currently
+                                     * hidden.
+                                     *
+                                     * Show it.
+                                     */
+                                    transformationMethod =
+                                        null
+                                }
+
+
+                                /*
+                                 * Keep cursor at the end.
+                                 */
+                                setSelection(
+                                    text.length
+                                )
+
+
+                                return@setOnTouchListener true
+                            }
+                        }
+                    }
+
+
+                    false
+                }
             }
 
-            setSelection(text.length)
 
-            true
+        // -----------------------------------------------------
+        // LOGIN STATUS
+        // -----------------------------------------------------
 
-        } else {
-            false
-        }
-    }
-}
+        val loginStatus =
+            TextView(this).apply {
 
-        val loginStatus = TextView(this).apply {
-            textSize = 16f
-            setPadding(0, 30, 0, 30)
-        }
+                textSize =
+                    16f
 
-        /*
-         * Declare the variable first.
-         *
-         * We cannot reference loginButton while the Button
-         * itself is still being initialized.
-         */
+                setPadding(
+                    0,
+                    30,
+                    0,
+                    30
+                )
+            }
+
+
+        // -----------------------------------------------------
+        // LOGIN BUTTON
+        // -----------------------------------------------------
+
         lateinit var loginButton: Button
 
-        loginButton = Button(this)
 
-        loginButton.text = "Login"
+        loginButton =
+            Button(this)
+
+
+        loginButton.text =
+            "Login"
+
 
         loginButton.setOnClickListener {
 
             val staffId =
-                staffIdInput.text.toString().trim()
+                staffIdInput
+                    .text
+                    .toString()
+                    .trim()
+
 
             val password =
-                passwordInput.text.toString()
+                passwordInput
+                    .text
+                    .toString()
+
 
             if (staffId.isEmpty()) {
 
@@ -401,6 +657,7 @@ class MainActivity : ComponentActivity() {
                 return@setOnClickListener
             }
 
+
             if (password.isEmpty()) {
 
                 loginStatus.text =
@@ -409,10 +666,14 @@ class MainActivity : ComponentActivity() {
                 return@setOnClickListener
             }
 
-            loginButton.isEnabled = false
+
+            loginButton.isEnabled =
+                false
+
 
             loginStatus.text =
                 "Authenticating..."
+
 
             login(
                 staffId = staffId,
@@ -422,15 +683,27 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+
+        // -----------------------------------------------------
+        // ADD VIEWS
+        // -----------------------------------------------------
+
         layout.addView(title)
+
         layout.addView(information)
+
         layout.addView(staffIdInput)
+
         layout.addView(passwordInput)
+
         layout.addView(loginStatus)
+
         layout.addView(loginButton)
+
 
         setContentView(layout)
     }
+
 
     // ---------------------------------------------------------
     // BACKEND LOGIN
@@ -443,49 +716,77 @@ class MainActivity : ComponentActivity() {
         loginButton: Button
     ) {
 
-        val token = sessionToken
+        val token =
+            sessionToken
+
 
         if (token.isNullOrBlank()) {
 
             loginStatus.text =
                 "Session is missing. Please scan the QR again."
 
-            loginButton.isEnabled = true
+
+            loginButton.isEnabled =
+                true
+
 
             return
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
+
+        CoroutineScope(
+            Dispatchers.IO
+        ).launch {
 
             try {
 
                 val response =
                     ApiClient.api.login(
                         LoginRequest(
-                            session_token = token,
-                            staff_id = staffId,
-                            password = password
+                            session_token =
+                                token,
+                            staff_id =
+                                staffId,
+                            password =
+                                password
                         )
                     )
 
-                withContext(Dispatchers.Main) {
 
-                    loginButton.isEnabled = true
+                withContext(
+                    Dispatchers.Main
+                ) {
 
-                    if (response.isSuccessful) {
+                    loginButton.isEnabled =
+                        true
 
-                        val body = response.body()
 
-                        if (body != null && body.success) {
+                    if (
+                        response.isSuccessful
+                    ) {
+
+                        val body =
+                            response.body()
+
+
+                        if (
+                            body != null &&
+                            body.success
+                        ) {
 
                             /*
                              * Authentication succeeded.
                              *
-                             * Keep capture token in memory only.
+                             * Keep capture token
+                             * in memory only.
                              */
-                            captureToken = body.capture_token
+                            captureToken =
+                                body.capture_token
 
-                            showReadyScreen(body.staff_name)
+
+                            showReadyScreen(
+                                body.staff_name
+                            )
 
                         } else {
 
@@ -495,19 +796,26 @@ class MainActivity : ComponentActivity() {
 
                     } else {
 
-                        when (response.code()) {
+                        when (
+                            response.code()
+                        ) {
 
                             401 -> {
+
                                 loginStatus.text =
                                     "Invalid Staff ID or password."
                             }
 
+
                             403 -> {
+
                                 loginStatus.text =
                                     "Staff is not authorized."
                             }
 
+
                             else -> {
+
                                 loginStatus.text =
                                     "Server error: ${response.code()}"
                             }
@@ -517,9 +825,13 @@ class MainActivity : ComponentActivity() {
 
             } catch (e: Exception) {
 
-                withContext(Dispatchers.Main) {
+                withContext(
+                    Dispatchers.Main
+                ) {
 
-                    loginButton.isEnabled = true
+                    loginButton.isEnabled =
+                        true
+
 
                     loginStatus.text =
                         "Unable to connect to server."
@@ -527,6 +839,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
 
     // ---------------------------------------------------------
     // READY SCREEN
@@ -536,58 +849,103 @@ class MainActivity : ComponentActivity() {
         staffName: String
     ) {
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
-        }
+        val layout =
+            LinearLayout(this).apply {
 
-        val title = TextView(this).apply {
-            text = "Smart Capture"
-            textSize = 28f
-        }
+                orientation =
+                    LinearLayout.VERTICAL
 
-        val status = TextView(this).apply {
-            text =
-                "Authentication successful\n\nWelcome, $staffName"
-            textSize = 18f
-            setPadding(0, 40, 0, 40)
-        }
-
-        val captureButton = Button(this).apply {
-            text = "Capture Document"
-
-            setOnClickListener {
-
-                /*
-                 * Next phase:
-                 *
-                 * Open camera
-                 * Capture document
-                 * Crop
-                 * Perspective correction
-                 * Image quality check
-                 * Upload to DMS
-                 */
-                status.text =
-                    "Document capture will be implemented next."
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
             }
-        }
 
-        val logoutButton = Button(this).apply {
-            text = "Logout"
 
-            setOnClickListener {
-                logout()
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Smart Capture"
+
+                textSize =
+                    28f
             }
-        }
+
+
+        val status =
+            TextView(this).apply {
+
+                text =
+                    "Authentication successful\n\n" +
+                    "Welcome, $staffName"
+
+                textSize =
+                    18f
+
+                setPadding(
+                    0,
+                    40,
+                    0,
+                    40
+                )
+            }
+
+
+        val captureButton =
+            Button(this).apply {
+
+                text =
+                    "Capture Document"
+
+
+                setOnClickListener {
+
+                    /*
+                     * Next phase:
+                     *
+                     * 1. Open camera
+                     * 2. Capture document
+                     * 3. Detect document edges
+                     * 4. Crop
+                     * 5. Perspective correction
+                     * 6. Image quality check
+                     * 7. Upload to DMS
+                     */
+                    status.text =
+                        "Document capture will be implemented next."
+                }
+            }
+
+
+        val logoutButton =
+            Button(this).apply {
+
+                text =
+                    "Logout"
+
+
+                setOnClickListener {
+
+                    logout()
+                }
+            }
+
 
         layout.addView(title)
+
         layout.addView(status)
+
         layout.addView(captureButton)
+
         layout.addView(logoutButton)
+
 
         setContentView(layout)
     }
+
 
     // ---------------------------------------------------------
     // LOGOUT
@@ -596,14 +954,19 @@ class MainActivity : ComponentActivity() {
     private fun logout() {
 
         /*
-         * Important:
-         * Destroy both tokens from memory.
+         * Destroy authentication information
+         * from memory.
          */
-        sessionToken = null
-        captureToken = null
+        sessionToken =
+            null
+
+        captureToken =
+            null
+
 
         showMainScreen()
     }
+
 
     // ---------------------------------------------------------
     // ACTIVITY CLEANUP
@@ -613,8 +976,16 @@ class MainActivity : ComponentActivity() {
 
         super.onDestroy()
 
-        sessionToken = null
-        captureToken = null
+
+        /*
+         * Clear sensitive tokens.
+         */
+        sessionToken =
+            null
+
+        captureToken =
+            null
+
 
         cameraExecutor.shutdown()
     }

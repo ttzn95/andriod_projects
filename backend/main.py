@@ -3,8 +3,33 @@ from secrets import token_urlsafe
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+import base64
+import io
+import qrcode
+
 app = FastAPI(title="Smart Capture API")
 
+def generate_qr_base64(data: str) -> str:
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+
+    qr.add_data(data)
+    qr.make(fit=True)
+
+    image = qr.make_image()
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    encoded = base64.b64encode(
+        buffer.getvalue()
+    ).decode("utf-8")
+
+    return f"data:image/png;base64,{encoded}"
 
 # ---------------------------------------------------------
 # Temporary in-memory data for development only
@@ -38,11 +63,13 @@ def root():
 @app.post("/api/sessions")
 def create_session():
 
+    # Generate a random session token
     session_token = token_urlsafe(32)
 
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=5)
 
+    # Store session in memory
     sessions[session_token] = {
         "created_at": now,
         "expires_at": expires_at,
@@ -51,8 +78,18 @@ def create_session():
         "capture_token": None
     }
 
+    # Generate QR code containing the session token
+    qr_code = generate_qr_base64(session_token)
+
+    print("========== SESSION REQUEST ==========")
+    print("session token:", session_token)
+    print("expires_at:", expires_at.isoformat())
+    print("=====================================")
+
     return {
+        "success": True,
         "session_token": session_token,
+        "qr_code": qr_code,
         "expires_at": expires_at.isoformat(),
         "status": "CREATED"
     }
@@ -60,6 +97,12 @@ def create_session():
 
 @app.post("/api/auth/login")
 def login(request: LoginRequest):
+    print("========== LOGIN REQUEST ==========")
+    print("staff_id:", request.staff_id)
+    print("session_token present:", bool(request.session_token))
+    print("session_token value:", request.session_token)
+    print("password present:", bool(request.password))
+    print("===================================")
 
     session = sessions.get(request.session_token)
 

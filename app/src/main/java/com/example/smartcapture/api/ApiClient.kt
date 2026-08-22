@@ -9,7 +9,6 @@ object ApiClient {
         "https://improved-doodle-976pxr49xqq5fwpr-8000.app.github.dev/"
 
     val api: SmartCaptureApi by lazy {
-
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .addConverterFactory(

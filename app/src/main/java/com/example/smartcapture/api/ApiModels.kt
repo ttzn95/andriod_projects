@@ -23,7 +23,9 @@ data class SessionResponse(
 data class UploadResponse(
     val success: Boolean,
     val message: String,
+    val capture_id: String?,
     val filename: String?,
+    val photo_side: String? = null,
     val staff_id: String?,
     val size: Int?
 )

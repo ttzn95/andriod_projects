@@ -1,6 +1,7 @@
 package com.example.smartcapture.camera
 
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -10,12 +11,18 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.smartcapture.MainActivity
 import java.io.File
+import java.io.FileOutputStream
 
 class CapturePreview(
     private val activity: MainActivity
 ) {
 
-    fun showImagePreview(file: File) {
+    fun showImagePreview(files: List<File>) {
+
+        if (files.isEmpty()) return
+
+        var currentIndex = files.lastIndex
+        var currentFile = files[currentIndex]
 
         val spacing =
             (12 * activity.resources.displayMetrics.density).toInt()
@@ -26,6 +33,13 @@ class CapturePreview(
         layout.addView(
             activity.createTitle("Captured Image")
         )
+
+        layout.addView(TextView(activity).apply {
+            text = "PAGE IMAGES: ${files.size}"
+            textSize = 13f
+            setTextColor(Color.rgb(168, 184, 180))
+            setPadding(0, 0, 0, 10)
+        })
 
         layout.addView(
             TextView(activity).apply {
@@ -38,18 +52,13 @@ class CapturePreview(
         )
 
         val imageView =
-            ImageView(activity).apply {
+            ZoomPanImageView(activity).apply {
 
                 setImageBitmap(
                     BitmapFactory.decodeFile(
-                        file.absolutePath
+                        currentFile.absolutePath
                     )
                 )
-
-                adjustViewBounds = false
-
-                scaleType =
-                    ImageView.ScaleType.FIT_CENTER
 
                 minimumHeight = 0
 
@@ -72,16 +81,69 @@ class CapturePreview(
             }
         )
 
-        // ---------------------------------------------------------
-        // RETAKE
-        // ---------------------------------------------------------
+        val zoomControls = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+        }
 
-        layout.addView(
-            activity.createButton("Retake") {
+        zoomControls.addView(activity.createButton("-") {
+            imageView.zoomOut()
+        })
+        zoomControls.addView(activity.createButton("Reset") {
+            imageView.resetZoom()
+        })
+        zoomControls.addView(activity.createButton("+") {
+            imageView.zoomIn()
+        })
+        layout.addView(zoomControls)
 
-                activity.startDocumentCamera()
+        val pageControls = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+        }
+        val previousButton = activity.createButton("Previous") {
+            if (currentIndex > 0) {
+                currentIndex--
+                currentFile = files[currentIndex]
+                imageView.setImageBitmap(BitmapFactory.decodeFile(currentFile.absolutePath))
             }
-        )
+        }
+        val nextButton = activity.createButton("Next") {
+            if (currentIndex < files.lastIndex) {
+                currentIndex++
+                currentFile = files[currentIndex]
+                imageView.setImageBitmap(BitmapFactory.decodeFile(currentFile.absolutePath))
+            }
+        }
+        pageControls.addView(previousButton)
+        pageControls.addView(nextButton)
+        layout.addView(pageControls)
+
+        layout.addView(activity.createButton("Add from Gallery") {
+            activity.openGalleryPicker()
+        })
+        layout.addView(activity.createButton("Add from Camera") {
+            activity.startDocumentCamera()
+        })
+
+        layout.addView(activity.createButton("Crop") {
+            val cropped = imageView.createVisibleCrop()
+            if (cropped == null) {
+                activity.showCaptureError("Unable to crop this image.")
+                return@createButton
+            }
+            val croppedFile = File(
+                activity.cacheDir,
+                "capture_crop_${System.currentTimeMillis()}.jpg"
+            )
+            FileOutputStream(croppedFile).use { output ->
+                cropped.compress(Bitmap.CompressFormat.JPEG, 95, output)
+            }
+            cropped.recycle()
+            activity.replaceCapturedImage(croppedFile, currentFile)
+            currentFile = croppedFile
+            imageView.setImageBitmap(BitmapFactory.decodeFile(currentFile.absolutePath))
+        })
 
         // ---------------------------------------------------------
         // CONFIRM

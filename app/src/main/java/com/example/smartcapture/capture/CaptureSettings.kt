@@ -6,6 +6,8 @@ data class CaptureSettings(
 
     var photoType: PhotoType? = null,
 
+    var photoSide: PhotoSide? = null,
+
     var documentSize: DocumentSize? = null,
 
     var customDocumentWidthMm: Float? = null,

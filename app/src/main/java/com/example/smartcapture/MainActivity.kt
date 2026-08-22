@@ -6,12 +6,15 @@ import okhttp3.RequestBody
 import retrofit2.Retrofit
 import com.example.smartcapture.camera.CapturePreview
 import com.example.smartcapture.camera.DocumentCamera
+import com.example.smartcapture.camera.PageImage
+import com.example.smartcapture.camera.ImageProcessor
 import com.example.smartcapture.capture.CaptureSettings
 import com.example.smartcapture.capture.CaptureType
 import com.example.smartcapture.capture.ColorMode
 import com.example.smartcapture.capture.DocumentSize
 import com.example.smartcapture.capture.OrientationMode
 import com.example.smartcapture.capture.PhotoType
+import com.example.smartcapture.capture.PhotoSide
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
@@ -21,6 +24,7 @@ import android.graphics.Typeface
 import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -65,6 +69,10 @@ import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
 
+    private val invalidSessionMessage =
+        "Your session token is expired or destroyed.\n" +
+                "Please start with scaning the QR code and try again!"
+
     private val ink get() = getColor(R.color.sc_ink)
     private val panel get() = getColor(R.color.sc_panel)
     private val paper get() = getColor(R.color.sc_paper)
@@ -78,6 +86,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var statusText: TextView
     private lateinit var capturePreview: CapturePreview
+    private val secureCredentialStore by lazy { SecureCredentialStore(this) }
 
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -85,6 +94,14 @@ class MainActivity : ComponentActivity() {
     private var captureToken: String? = null 
     private var captureSettings = CaptureSettings()
     private var capturedImageFile: File? = null
+    private val pageImages = mutableListOf<PageImage>()
+    private var lastCaptureId: String? = null
+
+    private fun clearPageImages() {
+        pageImages.forEach { it.file.delete() }
+        pageImages.clear()
+        capturedImageFile = null
+    }
 
     // ---------------------------------------------------------
     // CAMERA PERMISSION
@@ -100,6 +117,13 @@ class MainActivity : ComponentActivity() {
             } else {
                 statusText.text =
                     "Camera permission is required."
+            }
+        }
+
+    private val galleryPicker =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) {
+                importGalleryImages(uris)
             }
         }
 
@@ -683,6 +707,14 @@ class MainActivity : ComponentActivity() {
         content.addView(loginStatus)
         content.addView(loginButton)
 
+        if (secureCredentialStore.hasSavedCredentials()) {
+            content.addView(
+                createButton("Use saved PIN") {
+                    showPinLoginDialog(loginStatus, loginButton)
+                }
+            )
+        }
+
         setContentView(layout)
     }
 
@@ -741,6 +773,7 @@ class MainActivity : ComponentActivity() {
                             showReadyScreen(
                                 body.staff_name
                             )
+                            offerPinSetup(staffId, password)
 
                         } else {
 
@@ -751,11 +784,18 @@ class MainActivity : ComponentActivity() {
 
                         when (response.code()) {
 
-                            401 ->
-                                showLoginError(
-                                    loginStatus,
-                                    getApiErrorMessage(response.errorBody()?.string())
-                                )
+                            401 -> {
+                                val detail = getApiErrorDetail(response.errorBody()?.string())
+
+                                if (isInvalidSessionDetail(detail)) {
+                                    handleInvalidSession()
+                                } else {
+                                    showLoginError(
+                                        loginStatus,
+                                        detail ?: "Authentication failed. Please try again."
+                                    )
+                                }
+                            }
 
                             403 ->
                                 showLoginError(loginStatus, "Staff is not authorized.")
@@ -830,6 +870,62 @@ class MainActivity : ComponentActivity() {
         capturePreview.showCaptureError(message)
     }
 
+    fun replaceCapturedImage(file: File, previousFile: File) {
+        capturedImageFile = file
+        val index = pageImages.indexOfFirst { it.file == previousFile }
+        if (index >= 0) {
+            pageImages[index] = PageImage(file)
+        }
+        if (file != previousFile) {
+            previousFile.delete()
+        }
+    }
+
+    fun openGalleryPicker() {
+        galleryPicker.launch(arrayOf("image/*"))
+    }
+
+    private fun appendCapturedImage(file: File) {
+        pageImages.add(PageImage(file))
+        capturedImageFile = file
+        capturePreview.showImagePreview(pageImages.map { it.file })
+    }
+
+    private fun importGalleryImages(uris: List<Uri>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val imported = uris.mapIndexedNotNull { index, uri ->
+                val source = File(cacheDir, "gallery_${System.currentTimeMillis()}_$index.jpg")
+                try {
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        source.outputStream().use { output -> input.copyTo(output) }
+                    } ?: return@mapIndexedNotNull null
+                    if (captureSettings.colorMode == ColorMode.BLACK_WHITE) {
+                        val converted = File(cacheDir, "gallery_bw_${System.currentTimeMillis()}_$index.jpg")
+                        if (ImageProcessor.convertToBlackAndWhite(source, converted)) {
+                            source.delete()
+                            converted
+                        } else {
+                            converted.delete()
+                            source
+                        }
+                    } else {
+                        source
+                    }
+                } catch (_: Exception) {
+                    source.delete()
+                    null
+                }
+            }
+            withContext(Dispatchers.Main) {
+                imported.forEach { pageImages.add(PageImage(it)) }
+                if (imported.isNotEmpty()) {
+                    capturedImageFile = imported.last()
+                    capturePreview.showImagePreview(pageImages.map { it.file })
+                }
+            }
+        }
+    }
+
     // ---------------------------------------------------------
     // UPLOAD CapturedImage
     // ---------------------------------------------------------
@@ -839,9 +935,9 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val file = capturedImageFile
+        val files = pageImages.map { it.file }
 
-        if (file == null) {
+        if (files.isEmpty()) {
             showCaptureError("No captured image available.")
             return
         }
@@ -850,6 +946,16 @@ class MainActivity : ComponentActivity() {
 
         if (token.isNullOrBlank()) {
             showCaptureError("Capture session is not authenticated.")
+            return
+        }
+
+        val settings = captureSettings
+
+        val captureType =
+            settings.captureType?.name
+
+        if (captureType.isNullOrBlank()) {
+            showCaptureError("Capture type is not selected.")
             return
         }
 
@@ -864,32 +970,91 @@ class MainActivity : ComponentActivity() {
                         MediaType.parse("text/plain"),
                         token
                     )
+                
+                val captureTypeBody =
+                    RequestBody.create(
+                        MediaType.parse("text/plain"),
+                        captureType
+                    )
 
-                val mimeType =
-                    when (file.extension.lowercase()) {
+                val photoTypeBody =
+                    settings.photoType?.name?.let {
+                        RequestBody.create(
+                            MediaType.parse("text/plain"),
+                            it
+                        )
+                    }
+
+                val photoSideBody =
+                    settings.photoSide?.name?.let {
+                        RequestBody.create(
+                            MediaType.parse("text/plain"),
+                            it
+                        )
+                    }
+
+                val documentSizeBody =
+                    settings.documentSize?.name?.let {
+                        RequestBody.create(
+                            MediaType.parse("text/plain"),
+                            it
+                        )
+                    }
+
+                val customWidthBody =
+                    settings.customDocumentWidthMm?.toString()?.let {
+                        RequestBody.create(
+                            MediaType.parse("text/plain"),
+                            it
+                        )
+                    }
+
+                val customHeightBody =
+                    settings.customDocumentHeightMm?.toString()?.let {
+                        RequestBody.create(
+                            MediaType.parse("text/plain"),
+                            it
+                        )
+                    }
+
+                val colorModeBody =
+                    RequestBody.create(
+                        MediaType.parse("text/plain"),
+                        settings.colorMode.name
+                    )
+
+                val orientationBody =
+                    RequestBody.create(
+                        MediaType.parse("text/plain"),
+                        settings.orientation.name
+                    )
+
+                val imageParts = files.map { file ->
+                    val mimeType = when (file.extension.lowercase()) {
                         "jpg", "jpeg" -> "image/jpeg"
                         "png" -> "image/png"
                         "svg" -> "image/svg+xml"
                         else -> "application/octet-stream"
                     }
-
-                val imageBody =
-                    RequestBody.create(
-                        MediaType.parse(mimeType),
-                        file
-                    )
-
-                val imagePart =
                     MultipartBody.Part.createFormData(
-                        "image",
+                        "images",
                         file.name,
-                        imageBody
+                        RequestBody.create(MediaType.parse(mimeType), file)
                     )
+                }
 
                 val response =
                     ApiClient.api.uploadCapture(
-                        tokenBody,
-                        imagePart
+                        captureToken = tokenBody,
+                        captureType = captureTypeBody,
+                        photoType = photoTypeBody,
+                        photoSide = photoSideBody,
+                        documentSize = documentSizeBody,
+                        customDocumentWidthMm = customWidthBody,
+                        customDocumentHeightMm = customHeightBody,
+                        colorMode = colorModeBody,
+                        orientation = orientationBody,
+                        images = imageParts
                     )
 
                 withContext(Dispatchers.Main) {
@@ -898,13 +1063,11 @@ class MainActivity : ComponentActivity() {
 
                         val result = response.body()
 
-                        if (result?.success == true) {
-
-                            uploadInProgress = false
-                            capturedImageFile?.delete()
-                            capturedImageFile = null
-                            showUploadCompleteDialog()
-
+                        if (result?.success == true) { 
+                            lastCaptureId = result.capture_id 
+                            uploadInProgress = false 
+                            clearPageImages()
+                            getLastCapture()
                         } else {
 
                             uploadInProgress = false
@@ -916,12 +1079,14 @@ class MainActivity : ComponentActivity() {
 
                     } else {
 
+                        val detail = getApiErrorDetail(response.errorBody()?.string())
                         uploadInProgress = false
-                        showCaptureError(
-                            getApiErrorMessage(
-                                response.errorBody()?.string()
-                            )
-                        )
+
+                        if (response.code() == 401 && isInvalidSessionDetail(detail)) {
+                            handleInvalidSession()
+                        } else {
+                            showCaptureError(detail ?: "Request failed. Please try again.")
+                        }
                     }
                 }
 
@@ -939,26 +1104,183 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun getLastCapture() { 
+        val captureId = lastCaptureId 
+        if (captureId.isNullOrBlank()) {
+            showCaptureError("Capture ID is missing.")
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+
+            try {
+
+                val response =
+                    ApiClient.api.getCapture(captureId)
+
+                withContext(Dispatchers.Main) {
+
+                    if (response.isSuccessful) {
+
+                        val result = response.body()
+
+                        if (result?.success == true) {
+
+                            val capture = result.capture
+
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Capture Retrieved")
+                                .setMessage(
+                                    "Capture ID: ${capture.capture_id}\n\n" +
+                                    "Staff ID: ${capture.staff_id}\n" +
+                                    "Type: ${capture.capture_type}\n" +
+                                    "Photo Type: ${capture.photo_type}\n" +
+                                    "Photo Side: ${capture.photo_side}\n" +
+                                    "Color: ${capture.color_mode}\n" +
+                                    "Orientation: ${capture.orientation}\n" +
+                                    "Filename: ${capture.filename}\n" +
+                                    "Status: ${capture.status}"
+                                )
+                                .setPositiveButton("OK") { _, _ ->
+                                    showCaptureCompleteScreen()
+                                }
+                                .show()
+
+                        } else {
+
+                            showCaptureError(
+                                "Unable to retrieve capture."
+                            )
+                        }
+
+                    } else {
+
+                        val detail = getApiErrorDetail(response.errorBody()?.string())
+
+                        if (response.code() == 401 && isInvalidSessionDetail(detail)) {
+                            handleInvalidSession()
+                        } else {
+                            showCaptureError(detail ?: "Request failed. Please try again.")
+                        }
+                    }
+                }
+
+            } catch (e: Exception) {
+
+                withContext(Dispatchers.Main) {
+
+                    showCaptureError(
+                        e.message
+                            ?: "Unable to retrieve capture."
+                    )
+                }
+            }
+        }
+    }
+
     private fun showLoginError(status: TextView, message: String) {
         status.setTextColor(errorColor)
         status.text = message
     }
 
+    private fun offerPinSetup(staffId: String, password: String) {
+        if (secureCredentialStore.hasSavedCredentials()) return
+
+        val pinInput = EditText(this).apply {
+            hint = "6-digit PIN"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        styleInput(pinInput)
+
+        AlertDialog.Builder(this)
+            .setTitle("Create quick PIN")
+            .setMessage("Use this PIN next time after scanning a QR code.")
+            .setView(pinInput)
+            .setPositiveButton("Save") { _, _ ->
+                val pin = pinInput.text.toString()
+                if (pin.length >= 6) {
+                    secureCredentialStore.save(
+                        pin,
+                        SecureCredentialStore.Credentials(staffId, password)
+                    )
+                }
+            }
+            .setNegativeButton("Not now", null)
+            .show()
+    }
+
+    private fun showPinLoginDialog(loginStatus: TextView, loginButton: Button) {
+        val pinInput = EditText(this).apply {
+            hint = "6-digit PIN"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        styleInput(pinInput)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Enter PIN")
+            .setView(pinInput)
+            .setPositiveButton("Login", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val credentials = secureCredentialStore.load(pinInput.text.toString())
+                if (credentials == null) {
+                    pinInput.error = "Incorrect PIN"
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                loginStatus.text = "Authenticating..."
+                loginStatus.setTextColor(muted)
+                loginButton.isEnabled = false
+                login(credentials.staffId, credentials.password, loginStatus, loginButton)
+            }
+        }
+        dialog.show()
+    }
+
     private fun getApiErrorMessage(errorBody: String?): String {
-        val detail = try {
+        return getApiErrorDetail(errorBody) ?: "Request failed. Please try again."
+    }
+
+    private fun getApiErrorDetail(errorBody: String?): String? {
+        return try {
             errorBody?.let { Gson().fromJson(it, ApiError::class.java).detail }
         } catch (_: Exception) {
             null
         }
+    }
 
-        return detail ?: "Request failed. Please try again."
+    private fun isInvalidSessionDetail(detail: String?): Boolean {
+        val normalized = detail?.lowercase() ?: return false
+        return normalized.contains("session") || normalized.contains("capture token")
+    }
+
+    private fun handleInvalidSession() {
+        sessionToken = null
+        captureToken = null
+        clearPageImages()
+        uploadInProgress = false
+
+        AlertDialog.Builder(this)
+            .setTitle("Session invalid")
+            .setMessage(invalidSessionMessage)
+            .setPositiveButton("OK") { _, _ ->
+                showMainScreen()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     private fun showUploadCompleteDialog() {
         AlertDialog.Builder(this)
             .setTitle("Upload complete")
-            .setMessage("Your captured image was uploaded successfully.")
-            .setPositiveButton("Continue") { _, _ ->
+            .setMessage(
+                "Capture ID:\n${lastCaptureId ?: "Unknown"}\n\n" +
+                "Image uploaded successfully."
+            )
+            .setPositiveButton("OK") { _, _ ->
                 showCaptureCompleteScreen()
             }
             .setCancelable(false)
@@ -981,6 +1303,7 @@ class MainActivity : ComponentActivity() {
             createButton("Photos") {
 
                 captureSettings.captureType =    CaptureType.PHOTO
+                clearPageImages()
 
                 showPhotoTypeScreen()
             }
@@ -989,6 +1312,7 @@ class MainActivity : ComponentActivity() {
             createButton("Documents") {
 
                 captureSettings.captureType =    CaptureType.DOCUMENT
+                clearPageImages()
 
                 showDocumentSizeScreen()
             }
@@ -1034,6 +1358,7 @@ class MainActivity : ComponentActivity() {
                 createButton(displayName) {
 
                     captureSettings.photoType = photoType
+                    captureSettings.photoSide = PhotoSide.FRONT
 
                     showColorModeScreen()
                 }
@@ -1177,10 +1502,46 @@ class MainActivity : ComponentActivity() {
     fun showColorModeScreen() {
 
         val layout = createVerticalLayout()
+        layout.setPadding(dp(24), dp(18), dp(24), dp(16))
 
         layout.addView(
             createTitle("Capture Settings")
         )
+
+        if (captureSettings.captureType == CaptureType.PHOTO) {
+            layout.addView(createTitle("Photo Side"))
+
+            val sideLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 8, 0, 8)
+            }
+
+            val frontButton = createSelectionButton(
+                iconRes = android.R.drawable.ic_menu_camera,
+                title = "Front",
+                selected = captureSettings.photoSide == PhotoSide.FRONT
+            ) {
+                captureSettings.photoSide = PhotoSide.FRONT
+                showColorModeScreen()
+            }
+
+            val backButton = createSelectionButton(
+                iconRes = android.R.drawable.ic_menu_camera,
+                title = "Back",
+                selected = captureSettings.photoSide == PhotoSide.BACK
+            ) {
+                captureSettings.photoSide = PhotoSide.BACK
+                showColorModeScreen()
+            }
+
+            sideLayout.addView(frontButton, LinearLayout.LayoutParams(0, dp(92), 1f).apply {
+                setMargins(0, 0, dp(6), dp(6))
+            })
+            sideLayout.addView(backButton, LinearLayout.LayoutParams(0, dp(92), 1f).apply {
+                setMargins(dp(6), 0, 0, dp(6))
+            })
+            layout.addView(sideLayout)
+        }
 
         // ---------------------------------------------------------
         // COLOR MODE
@@ -1193,7 +1554,7 @@ class MainActivity : ComponentActivity() {
         val colorLayout =
             LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 20, 0, 20)
+                setPadding(0, 8, 0, 8)
             }
 
         val colorButton =
@@ -1230,10 +1591,10 @@ class MainActivity : ComponentActivity() {
             colorButton,
             LinearLayout.LayoutParams(
                 0,
-                dp(132),
+                dp(92),
                 1f
             ).apply {
-                setMargins(0, 0, dp(6), dp(12))
+                setMargins(0, 0, dp(6), dp(6))
             }
         )
 
@@ -1241,10 +1602,10 @@ class MainActivity : ComponentActivity() {
             blackWhiteButton,
             LinearLayout.LayoutParams(
                 0,
-                dp(132),
+                dp(92),
                 1f
             ).apply {
-                setMargins(dp(6), 0, 0, dp(12))
+                setMargins(dp(6), 0, 0, dp(6))
             }
         )
 
@@ -1261,7 +1622,7 @@ class MainActivity : ComponentActivity() {
         val orientationLayout =
             LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 20, 0, 20)
+                setPadding(0, 8, 0, 8)
             }
 
         val portraitButton =
@@ -1298,10 +1659,10 @@ class MainActivity : ComponentActivity() {
             portraitButton,
             LinearLayout.LayoutParams(
                 0,
-                dp(132),
+                dp(92),
                 1f
             ).apply {
-                setMargins(0, 0, dp(6), dp(12))
+                setMargins(0, 0, dp(6), dp(6))
             }
         )
 
@@ -1309,10 +1670,10 @@ class MainActivity : ComponentActivity() {
             landscapeButton,
             LinearLayout.LayoutParams(
                 0,
-                dp(132),
+                dp(92),
                 1f
             ).apply {
-                setMargins(dp(6), 0, 0, dp(12))
+                setMargins(dp(6), 0, 0, dp(6))
             }
         )
 
@@ -1326,6 +1687,7 @@ class MainActivity : ComponentActivity() {
             TextView(this).apply {
 
                 text =
+                    "Photo Side: ${getPhotoSideDisplayName()}\n" +
                     "Color: ${getColorModeDisplayName()}\n" +
                     "Orientation: ${getOrientationDisplayName()}"
 
@@ -1454,6 +1816,21 @@ class MainActivity : ComponentActivity() {
         }
     } 
 
+    private fun getPhotoSideDisplayName(): String {
+
+        return when (captureSettings.photoSide) {
+
+            PhotoSide.FRONT ->
+                "Front"
+
+            PhotoSide.BACK ->
+                "Back"
+
+            null ->
+                "Not selected"
+        }
+    }
+
     private fun getOrientationDisplayName(): String {
 
         return when (captureSettings.orientation) {
@@ -1480,8 +1857,7 @@ class MainActivity : ComponentActivity() {
                 captureSettings = captureSettings,
 
                 onImageCaptured = { file ->
-                    capturedImageFile = file
-                    capturePreview.showImagePreview(file)
+                    appendCapturedImage(file)
                 },
 
                 onCaptureError = { message ->
@@ -1621,6 +1997,15 @@ class MainActivity : ComponentActivity() {
             textValue.contains("Login") -> android.R.drawable.ic_menu_send
             textValue.contains("Capture") -> android.R.drawable.ic_menu_camera
             textValue.contains("Confirm") -> android.R.drawable.ic_menu_upload
+            textValue.contains("Gallery") -> android.R.drawable.ic_menu_gallery
+            textValue.contains("Camera") -> android.R.drawable.ic_menu_camera
+            textValue.contains("Crop") -> android.R.drawable.ic_menu_crop
+            textValue == "Previous" -> android.R.drawable.ic_media_previous
+            textValue == "Next" -> android.R.drawable.ic_media_next
+            textValue == "Reset" -> android.R.drawable.ic_popup_sync
+            textValue == "+" -> android.R.drawable.ic_input_add
+            textValue == "-" -> android.R.drawable.ic_delete
+            textValue.contains("PIN") -> android.R.drawable.ic_lock_lock
             textValue.contains("Continue") -> android.R.drawable.ic_media_next
             textValue.contains("Retake") -> android.R.drawable.ic_menu_rotate
             textValue.contains("Back") -> android.R.drawable.ic_media_previous
@@ -1706,7 +2091,7 @@ class MainActivity : ComponentActivity() {
         captureSettings =
             CaptureSettings()
 
-        capturedImageFile = null 
+        clearPageImages()
 
         showMainScreen()
     }
@@ -1729,6 +2114,7 @@ class MainActivity : ComponentActivity() {
                 text =
                     "The image has been captured successfully.\n\n" +
                     "Type: ${captureSettings.captureType?.name ?: "Unknown"}\n" +
+                    "Photo Side: ${getPhotoSideDisplayName()}\n" +
                     "Color: ${getColorModeDisplayName()}\n" +
                     "Orientation: ${getOrientationDisplayName()}"
 
@@ -1760,7 +2146,7 @@ class MainActivity : ComponentActivity() {
         // ---------------------------------------------------------
 
         layout.addView(
-            createButton("Back to Main") {
+            createButton("Logout") {
 
                 logout()
             }

@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from pydantic import BaseModel 
+from fastapi.responses import FileResponse
 
 import base64
 import io
 import qrcode
 import os
+import uuid
 
 app = FastAPI(title="Smart Capture API")
 
@@ -37,6 +39,7 @@ def generate_qr_base64(data: str) -> str:
 # ---------------------------------------------------------
 
 sessions = {}
+captures = {}
 UPLOAD_DIR = "uploads"
 
 os.makedirs(
@@ -171,128 +174,219 @@ def login(request: LoginRequest):
 @app.post("/api/capture/upload")
 async def upload_capture(
     capture_token: str = Form(...),
-    image: UploadFile = File(...)
+    capture_type: str = Form(...),
+    photo_type: str | None = Form(None),
+    photo_side: str | None = Form(None),
+    document_size: str | None = Form(None),
+    custom_document_width_mm: float | None = Form(None),
+    custom_document_height_mm: float | None = Form(None),
+    color_mode: str = Form(...),
+    orientation: str = Form(...),
+    images: list[UploadFile] = File(...)
     ):
-
     print("========== IMAGE UPLOAD ==========")
-    print("capture_token present:", bool(capture_token))
-    print("filename:", image.filename)
-    print("content_type:", image.content_type)
-    print("token:", capture_token)
+    print("capture_token:", capture_token)
+    print("capture_type:", capture_type)
+    print("photo_type:", photo_type)
+    print("photo_side:", photo_side)
+    print("document_size:", document_size)
+    print("custom_document_width_mm:", custom_document_width_mm)
+    print("custom_document_height_mm:", custom_document_height_mm)
+    print("color_mode:", color_mode)
+    print("orientation:", orientation)
+    print("image count:", len(images))
     print("==================================")
 
     # ---------------------------------------------------------
-    # Validate capture token
+    # Find authenticated session
     # ---------------------------------------------------------
 
-    authenticated_session = None
+    session = None
 
-    for session in sessions.values():
+    for session_token, current_session in sessions.items():
 
-        if session.get("capture_token") == capture_token:
-
-            authenticated_session = session
-
+        if current_session.get("capture_token") == capture_token:
+            session = current_session
             break
 
-    if authenticated_session is None:
-
+    if session is None:
         raise HTTPException(
             status_code=401,
             detail="Invalid capture token"
         )
 
     # ---------------------------------------------------------
-    # Check session expiration
-    # ---------------------------------------------------------
-
-    now = datetime.now(timezone.utc)
-
-    if now >= authenticated_session["expires_at"]:
-
-        authenticated_session["status"] = "EXPIRED"
-
-        raise HTTPException(
-            status_code=401,
-            detail="Capture session has expired"
-        )
-
-    # ---------------------------------------------------------
     # Check session status
     # ---------------------------------------------------------
 
-    if authenticated_session["status"] != "AUTHENTICATED":
-
+    if session["status"] != "AUTHENTICATED":
         raise HTTPException(
             status_code=401,
             detail="Capture session is not authenticated"
         )
 
     # ---------------------------------------------------------
-    # Validate uploaded file
+    # Check expiration
     # ---------------------------------------------------------
 
-    if image.content_type not in [
-        "image/jpeg",
-        "image/png"
-    ]:
+    now = datetime.now(timezone.utc)
+
+    if now >= session["expires_at"]:
+
+        session["status"] = "EXPIRED"
 
         raise HTTPException(
+            status_code=401,
+            detail="Capture session has expired"
+        )
+
+    if capture_type == "PHOTO" and photo_side not in {"FRONT", "BACK"}:
+        raise HTTPException(
             status_code=400,
-            detail="Only JPEG and PNG images are supported"
+            detail="Photo side must be FRONT or BACK"
+        )
+
+    if not images:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one image is required"
         )
 
     # ---------------------------------------------------------
-    # Read image
+    # Generate capture ID
     # ---------------------------------------------------------
 
-    image_data = await image.read()
+    capture_id = str(uuid.uuid4()) 
 
-    if not image_data:
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".svg"}
+    image_records = []
 
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded image is empty"
-        )
+    for sequence, image in enumerate(images):
+        original_filename = image.filename or f"capture_{sequence}"
+        extension = os.path.splitext(original_filename)[1].lower()
 
-    # ---------------------------------------------------------
-    # Generate filename
-    # ---------------------------------------------------------
+        if extension not in allowed_extensions:
+            raise HTTPException(status_code=400, detail="Unsupported image format")
 
-    timestamp = datetime.now().strftime(
-        "%Y%m%d_%H%M%S_%f"
-    )
+        stored_filename = f"{capture_id}_{sequence}{extension}"
+        file_path = os.path.join(UPLOAD_DIR, stored_filename)
+        contents = await image.read()
 
-    extension = ".jpg"
+        with open(file_path, "wb") as file:
+            file.write(contents)
 
-    if image.content_type == "image/png":
-        extension = ".png"
+        image_records.append({
+            "sequence": sequence,
+            "filename": original_filename,
+            "content_type": image.content_type,
+            "stored": str(file_path),
+            "size": len(contents)
+        })
 
-    filename = (
-        f"{authenticated_session['staff_id']}_"
-        f"{timestamp}"
-        f"{extension}"
-    )
-
-    file_path = os.path.join(
-        UPLOAD_DIR,
-        filename
-    )
+    first_image = image_records[0]
 
     # ---------------------------------------------------------
-    # Save image
+    # Create capture record
     # ---------------------------------------------------------
 
-    with open(file_path, "wb") as output_file:
+    capture = {
+        "capture_id": capture_id,
+        "staff_id": session["staff_id"],
+        "capture_type": capture_type,
+        "photo_type": photo_type,
+        "photo_side": photo_side,
+        "document_size": document_size,
+        "custom_document_width_mm": custom_document_width_mm,
+        "custom_document_height_mm": custom_document_height_mm,
+        "color_mode": color_mode,
+        "orientation": orientation,
+        "filename": first_image["filename"],
+        "content_type": first_image["content_type"],
+        "stored": first_image["stored"],
+        "images": image_records,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "UPLOADED"
+    }
 
-        output_file.write(image_data)
+    captures[capture_id] = capture
 
-    print("Image saved:", file_path)
+    print("========== CAPTURE SAVED ==========")
+    print("capture_id:", capture_id)
+    print("staff_id:", session["staff_id"])
+    print("image count:", len(image_records))
+    print("===================================")
 
     return {
         "success": True,
         "message": "Image uploaded successfully",
-        "filename": filename,
-        "staff_id": authenticated_session["staff_id"],
-        "size": len(image_data)
+        "capture_id": capture_id,
+        "filename": first_image["filename"],
+        "image_count": len(image_records),
+        "photo_side": photo_side,
+        "staff_id": session["staff_id"],
+        "status": "UPLOADED",
+        "uploaded_at": now.isoformat()
     }
+
+@app.get("/api/capture/{capture_id}")
+async def get_capture(capture_id: str):
+
+    capture = captures.get(capture_id)
+
+    if capture is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Capture not found"
+        )
+
+    return {
+        "success": True,
+        "capture": capture
+    }
+
+@app.get("/api/captures")
+async def list_captures(staff_id: str):
+
+    results = []
+
+    for capture in captures.values():
+
+        if capture.get("staff_id") == staff_id:
+            results.append(capture)
+
+    return {
+        "success": True,
+        "count": len(results),
+        "captures": results
+    }
+
+@app.get("/api/capture/{capture_id}/image")
+async def get_capture_image(capture_id: str):
+
+    capture = captures.get(capture_id)
+
+    if capture is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Capture not found"
+        )
+
+    file_path = capture.get("stored")
+
+    if not file_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Capture file not found"
+        )
+
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Stored image does not exist"
+        )
+
+    return FileResponse(
+        path=file_path,
+        media_type=capture.get("content_type") or "application/octet-stream",
+        filename=capture["filename"]
+    )

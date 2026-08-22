@@ -20,6 +20,10 @@ import com.example.smartcapture.capture.OrientationMode
 import android.widget.Button
 import com.example.smartcapture.MainActivity
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class DocumentCamera(
     private val activity: MainActivity,
@@ -367,7 +371,26 @@ class DocumentCamera(
                 ) {
 
                     stopCamera()
-                    onImageCaptured(file)
+                    if (captureSettings.colorMode == com.example.smartcapture.capture.ColorMode.BLACK_WHITE) {
+                        val processedFile = File(
+                            activity.cacheDir,
+                            "capture_bw_${System.currentTimeMillis()}.jpg"
+                        )
+                        CoroutineScope(Dispatchers.Default).launch {
+                            val converted = ImageProcessor.convertToBlackAndWhite(file, processedFile)
+                            withContext(Dispatchers.Main) {
+                                if (converted) {
+                                    file.delete()
+                                    onImageCaptured(processedFile)
+                                } else {
+                                    processedFile.delete()
+                                    onImageCaptured(file)
+                                }
+                            }
+                        }
+                    } else {
+                        onImageCaptured(file)
+                    }
                 }
 
                 override fun onError(

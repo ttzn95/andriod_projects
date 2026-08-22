@@ -1,7 +1,8 @@
 package com.example.smartcapture
 
-
 import okhttp3.MultipartBody
+import okhttp3.MediaType
+import okhttp3.RequestBody
 import retrofit2.Retrofit
 import com.example.smartcapture.camera.CapturePreview
 import com.example.smartcapture.camera.DocumentCamera

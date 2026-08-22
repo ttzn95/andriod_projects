@@ -4,14 +4,12 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.InputType
-import android.text.method.PasswordTransformationMethod
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -20,17 +18,13 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-
 import com.example.smartcapture.api.ApiClient
 import com.example.smartcapture.api.LoginRequest
-
+import com.google.mlkit.vision.barcode.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-
 import java.util.concurrent.Executors
-
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,31 +40,48 @@ class MainActivity : ComponentActivity() {
         Executors.newSingleThreadExecutor()
 
     /*
-     * Session token returned/generated during QR session.
-     *
-     * IMPORTANT:
-     * Keep this only in memory.
-     *
-     * Do NOT save it to:
-     * - SharedPreferences
-     * - files
-     * - database
-     * - gallery
+     * ---------------------------------------------------------
+     * SESSION / AUTHENTICATION
+     * ---------------------------------------------------------
      */
+
     private var sessionToken: String? = null
 
-    /*
-     * Capture token returned by backend after
-     * successful staff authentication.
-     *
-     * Keep this only in memory.
-     */
     private var captureToken: String? = null
 
+    private var staffName: String? = null
 
-    // ---------------------------------------------------------
-    // CAMERA PERMISSION
-    // ---------------------------------------------------------
+
+    /*
+     * ---------------------------------------------------------
+     * CAPTURE SELECTION
+     * ---------------------------------------------------------
+     *
+     * Example:
+     *
+     * captureType = PHOTO
+     * captureSubType = NRC
+     * imageMode = COLOR
+     *
+     * OR
+     *
+     * captureType = DOCUMENT
+     * captureSubType = A4
+     * imageMode = BW
+     */
+
+    private var captureType: String? = null
+
+    private var captureSubType: String? = null
+
+    private var imageMode: String? = null
+
+
+    /*
+     * ---------------------------------------------------------
+     * CAMERA PERMISSION
+     * ---------------------------------------------------------
+     */
 
     private val cameraPermissionLauncher =
         registerForActivityResult(
@@ -89,9 +100,11 @@ class MainActivity : ComponentActivity() {
         }
 
 
-    // ---------------------------------------------------------
-    // ACTIVITY
-    // ---------------------------------------------------------
+    /*
+     * ---------------------------------------------------------
+     * ACTIVITY
+     * ---------------------------------------------------------
+     */
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -101,67 +114,65 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // MAIN SCREEN
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * MAIN SCREEN
+     * =========================================================
+     */
 
     private fun showMainScreen() {
 
-        val layout =
-            LinearLayout(this).apply {
+        val layout = LinearLayout(this).apply {
 
-                orientation =
-                    LinearLayout.VERTICAL
+            orientation =
+                LinearLayout.VERTICAL
 
-                setPadding(
-                    40,
-                    80,
-                    40,
-                    40
-                )
+            setPadding(
+                40,
+                80,
+                40,
+                40
+            )
+        }
+
+
+        val title = TextView(this).apply {
+
+            text =
+                "Smart Capture"
+
+            textSize =
+                28f
+        }
+
+
+        statusText = TextView(this).apply {
+
+            text =
+                "Ready"
+
+            textSize =
+                18f
+
+            setPadding(
+                0,
+                40,
+                0,
+                40
+            )
+        }
+
+
+        val scanButton = Button(this).apply {
+
+            text =
+                "Scan QR Code"
+
+            setOnClickListener {
+
+                requestCameraPermission()
             }
-
-
-        val title =
-            TextView(this).apply {
-
-                text =
-                    "Smart Capture"
-
-                textSize =
-                    28f
-            }
-
-
-        statusText =
-            TextView(this).apply {
-
-                text =
-                    "Ready"
-
-                textSize =
-                    18f
-
-                setPadding(
-                    0,
-                    40,
-                    0,
-                    40
-                )
-            }
-
-
-        val scanButton =
-            Button(this).apply {
-
-                text =
-                    "Scan QR Code"
-
-                setOnClickListener {
-
-                    requestCameraPermission()
-                }
-            }
+        }
 
 
         layout.addView(title)
@@ -175,9 +186,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // CAMERA PERMISSION
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * CAMERA PERMISSION
+     * =========================================================
+     */
 
     private fun requestCameraPermission() {
 
@@ -185,8 +198,7 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
-            ) ==
-            PackageManager.PERMISSION_GRANTED
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
 
             startQrScanner()
@@ -200,40 +212,40 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // QR SCANNER
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * QR SCANNER
+     * =========================================================
+     */
 
     private fun startQrScanner() {
 
-        val layout =
-            LinearLayout(this).apply {
+        val layout = LinearLayout(this).apply {
 
-                orientation =
-                    LinearLayout.VERTICAL
-            }
+            orientation =
+                LinearLayout.VERTICAL
+        }
 
 
         previewView =
             PreviewView(this)
 
 
-        val scannerStatus =
-            TextView(this).apply {
+        val scannerStatus = TextView(this).apply {
 
-                text =
-                    "Point the camera at the DMS QR code"
+            text =
+                "Point the camera at the DMS QR code"
 
-                textSize =
-                    18f
+            textSize =
+                18f
 
-                setPadding(
-                    20,
-                    20,
-                    20,
-                    20
-                )
-            }
+            setPadding(
+                20,
+                20,
+                20,
+                20
+            )
+        }
 
 
         layout.addView(
@@ -287,16 +299,13 @@ class MainActivity : ComponentActivity() {
 
 
             val scanner =
-                BarcodeScanning.getClient(
-                    options
-                )
+                BarcodeScanning.getClient(options)
 
 
             val imageAnalysis =
                 ImageAnalysis.Builder()
                     .setBackpressureStrategy(
-                        ImageAnalysis
-                            .STRATEGY_KEEP_ONLY_LATEST
+                        ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                     )
                     .build()
 
@@ -314,9 +323,7 @@ class MainActivity : ComponentActivity() {
                     val image =
                         InputImage.fromMediaImage(
                             mediaImage,
-                            imageProxy
-                                .imageInfo
-                                .rotationDegrees
+                            imageProxy.imageInfo.rotationDegrees
                         )
 
 
@@ -330,30 +337,21 @@ class MainActivity : ComponentActivity() {
                                     barcode.rawValue
 
 
-                                if (
-                                    !value.isNullOrBlank()
-                                ) {
+                                if (!value.isNullOrBlank()) {
 
                                     /*
-                                     * Stop scanning.
+                                     * Stop scanner immediately.
                                      */
-                                    imageAnalysis
-                                        .clearAnalyzer()
+
+                                    imageAnalysis.clearAnalyzer()
 
 
                                     runOnUiThread {
 
-                                        /*
-                                         * Never display
-                                         * the session token.
-                                         */
                                         scannerStatus.text =
                                             "QR detected. Validating session..."
 
-
-                                        handleQrCode(
-                                            value
-                                        )
+                                        handleQrCode(value)
                                     }
 
 
@@ -396,33 +394,38 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // HANDLE QR
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * HANDLE QR CODE
+     * =========================================================
+     */
 
     private fun handleQrCode(
         qrValue: String
     ) {
 
         /*
-         * Prototype:
-         *
-         * QR contains the session token directly.
-         *
-         * Later we will use a signed QR payload.
+         * For the current prototype the QR contains
+         * the session token directly.
          */
 
         sessionToken =
             qrValue
 
 
+        /*
+         * Next step is staff login.
+         */
+
         showLoginScreen()
     }
 
 
-    // ---------------------------------------------------------
-    // STAFF LOGIN SCREEN
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * STAFF LOGIN
+     * =========================================================
+     */
 
     private fun showLoginScreen() {
 
@@ -470,10 +473,6 @@ class MainActivity : ComponentActivity() {
             }
 
 
-        // -----------------------------------------------------
-        // STAFF ID
-        // -----------------------------------------------------
-
         val staffIdInput =
             EditText(this).apply {
 
@@ -485,10 +484,6 @@ class MainActivity : ComponentActivity() {
             }
 
 
-        // -----------------------------------------------------
-        // PASSWORD
-        // -----------------------------------------------------
-
         val passwordInput =
             EditText(this).apply {
 
@@ -497,12 +492,13 @@ class MainActivity : ComponentActivity() {
 
                 inputType =
                     InputType.TYPE_CLASS_TEXT or
-                    InputType.TYPE_TEXT_VARIATION_PASSWORD
+                            InputType.TYPE_TEXT_VARIATION_PASSWORD
 
 
                 /*
-                 * Use Android's built-in eye icon.
+                 * Password eye icon.
                  */
+
                 setCompoundDrawablesWithIntrinsicBounds(
                     0,
                     0,
@@ -511,98 +507,53 @@ class MainActivity : ComponentActivity() {
                 )
 
 
-                /*
-                 * Add spacing between text and icon.
-                 */
-                compoundDrawablePadding =
-                    16
-
-
-                /*
-                 * Handle tapping the eye icon.
-                 */
                 setOnTouchListener { _, event ->
 
                     if (
                         event.action ==
-                        MotionEvent.ACTION_UP
+                        MotionEvent.ACTION_UP &&
+                        event.x >=
+                        width -
+                        compoundDrawablePadding -
+                        80
                     ) {
 
-                        val drawable =
-                            compoundDrawables[2]
+                        val isPasswordVisible =
+                            inputType ==
+                                    (
+                                            InputType.TYPE_CLASS_TEXT or
+                                                    InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                                            )
 
 
-                        if (drawable != null) {
+                        if (isPasswordVisible) {
 
-                            val drawableWidth =
-                                drawable.intrinsicWidth
+                            inputType =
+                                InputType.TYPE_CLASS_TEXT or
+                                        InputType.TYPE_TEXT_VARIATION_PASSWORD
 
+                        } else {
 
-                            val drawableStart =
-                                width -
-                                paddingRight -
-                                drawableWidth
-
-
-                            /*
-                             * Give the icon a generous
-                             * touch area.
-                             */
-                            if (
-                                event.x >=
-                                drawableStart - 80
-                            ) {
-
-                                if (
-                                    transformationMethod ==
-                                    null
-                                ) {
-
-                                    /*
-                                     * Password is currently
-                                     * visible.
-                                     *
-                                     * Hide it.
-                                     */
-                                    transformationMethod =
-                                        PasswordTransformationMethod
-                                            .getInstance()
-
-                                } else {
-
-                                    /*
-                                     * Password is currently
-                                     * hidden.
-                                     *
-                                     * Show it.
-                                     */
-                                    transformationMethod =
-                                        null
-                                }
-
-
-                                /*
-                                 * Keep cursor at the end.
-                                 */
-                                setSelection(
-                                    text.length
-                                )
-
-
-                                return@setOnTouchListener true
-                            }
+                            inputType =
+                                InputType.TYPE_CLASS_TEXT or
+                                        InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                         }
+
+
+                        setSelection(
+                            text.length
+                        )
+
+
+                        true
+
+                    } else {
+
+                        false
                     }
-
-
-                    false
                 }
             }
 
-
-        // -----------------------------------------------------
-        // LOGIN STATUS
-        // -----------------------------------------------------
 
         val loginStatus =
             TextView(this).apply {
@@ -619,74 +570,66 @@ class MainActivity : ComponentActivity() {
             }
 
 
-        // -----------------------------------------------------
-        // LOGIN BUTTON
-        // -----------------------------------------------------
-
         lateinit var loginButton: Button
 
 
         loginButton =
-            Button(this)
+            Button(this).apply {
+
+                text =
+                    "Login"
 
 
-        loginButton.text =
-            "Login"
+                setOnClickListener {
+
+                    val staffId =
+                        staffIdInput
+                            .text
+                            .toString()
+                            .trim()
 
 
-        loginButton.setOnClickListener {
-
-            val staffId =
-                staffIdInput
-                    .text
-                    .toString()
-                    .trim()
+                    val password =
+                        passwordInput
+                            .text
+                            .toString()
 
 
-            val password =
-                passwordInput
-                    .text
-                    .toString()
+                    if (staffId.isEmpty()) {
+
+                        loginStatus.text =
+                            "Please enter Staff ID."
+
+                        return@setOnClickListener
+                    }
 
 
-            if (staffId.isEmpty()) {
+                    if (password.isEmpty()) {
 
-                loginStatus.text =
-                    "Please enter Staff ID."
+                        loginStatus.text =
+                            "Please enter password."
 
-                return@setOnClickListener
+                        return@setOnClickListener
+                    }
+
+
+                    loginButton.isEnabled =
+                        false
+
+
+                    loginStatus.text =
+                        "Authenticating..."
+
+
+                    login(
+                        staffId = staffId,
+                        password = password,
+                        loginStatus = loginStatus,
+                        loginButton = loginButton
+                    )
+                }
             }
 
-
-            if (password.isEmpty()) {
-
-                loginStatus.text =
-                    "Please enter password."
-
-                return@setOnClickListener
-            }
-
-
-            loginButton.isEnabled =
-                false
-
-
-            loginStatus.text =
-                "Authenticating..."
-
-
-            login(
-                staffId = staffId,
-                password = password,
-                loginStatus = loginStatus,
-                loginButton = loginButton
-            )
-        }
-
-
-        // -----------------------------------------------------
-        // ADD VIEWS
-        // -----------------------------------------------------
 
         layout.addView(title)
 
@@ -705,9 +648,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // BACKEND LOGIN
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * BACKEND LOGIN
+     * =========================================================
+     */
 
     private fun login(
         staffId: String,
@@ -725,10 +670,8 @@ class MainActivity : ComponentActivity() {
             loginStatus.text =
                 "Session is missing. Please scan the QR again."
 
-
             loginButton.isEnabled =
                 true
-
 
             return
         }
@@ -745,8 +688,10 @@ class MainActivity : ComponentActivity() {
                         LoginRequest(
                             session_token =
                                 token,
+
                             staff_id =
                                 staffId,
+
                             password =
                                 password
                         )
@@ -761,9 +706,7 @@ class MainActivity : ComponentActivity() {
                         true
 
 
-                    if (
-                        response.isSuccessful
-                    ) {
+                    if (response.isSuccessful) {
 
                         val body =
                             response.body()
@@ -775,13 +718,15 @@ class MainActivity : ComponentActivity() {
                         ) {
 
                             /*
-                             * Authentication succeeded.
-                             *
-                             * Keep capture token
-                             * in memory only.
+                             * Authentication successful.
                              */
+
                             captureToken =
                                 body.capture_token
+
+
+                            staffName =
+                                body.staff_name
 
 
                             showReadyScreen(
@@ -832,7 +777,6 @@ class MainActivity : ComponentActivity() {
                     loginButton.isEnabled =
                         true
 
-
                     loginStatus.text =
                         "Unable to connect to server."
                 }
@@ -841,12 +785,14 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // READY SCREEN
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * READY / CAPTURE TYPE SCREEN
+     * =========================================================
+     */
 
     private fun showReadyScreen(
-        staffName: String
+        currentStaffName: String
     ) {
 
         val layout =
@@ -875,47 +821,66 @@ class MainActivity : ComponentActivity() {
             }
 
 
-        val status =
+        val welcome =
             TextView(this).apply {
 
                 text =
-                    "Authentication successful\n\n" +
-                    "Welcome, $staffName"
+                    "Welcome, $currentStaffName"
 
                 textSize =
                     18f
 
                 setPadding(
                     0,
-                    40,
+                    30,
                     0,
-                    40
+                    20
                 )
             }
 
 
-        val captureButton =
+        val instruction =
+            TextView(this).apply {
+
+                text =
+                    "What would you like to capture?"
+
+                textSize =
+                    18f
+
+                setPadding(
+                    0,
+                    20,
+                    0,
+                    30
+                )
+            }
+
+
+        val photosButton =
             Button(this).apply {
 
                 text =
-                    "Capture Document"
+                    "Photos"
 
 
                 setOnClickListener {
 
-                    /*
-                     * Next phase:
-                     *
-                     * 1. Open camera
-                     * 2. Capture document
-                     * 3. Detect document edges
-                     * 4. Crop
-                     * 5. Perspective correction
-                     * 6. Image quality check
-                     * 7. Upload to DMS
-                     */
-                    status.text =
-                        "Document capture will be implemented next."
+                    showPhotoTypes()
+                }
+            }
+
+
+        val documentsButton =
+            Button(this).apply {
+
+                text =
+                    "Documents"
+
+
+                setOnClickListener {
+
+                    showDocumentSizes()
                 }
             }
 
@@ -936,9 +901,13 @@ class MainActivity : ComponentActivity() {
 
         layout.addView(title)
 
-        layout.addView(status)
+        layout.addView(welcome)
 
-        layout.addView(captureButton)
+        layout.addView(instruction)
+
+        layout.addView(photosButton)
+
+        layout.addView(documentsButton)
 
         layout.addView(logoutButton)
 
@@ -947,20 +916,649 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // LOGOUT
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * PHOTO TYPES
+     * =========================================================
+     */
+
+    private fun showPhotoTypes() {
+
+        val layout =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
+            }
+
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Select Photo Type"
+
+                textSize =
+                    28f
+            }
+
+
+        layout.addView(title)
+
+
+        val licenseButton =
+            Button(this).apply {
+
+                text =
+                    "License"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "PHOTO",
+                        "LICENSE"
+                    )
+                }
+            }
+
+
+        val nrcButton =
+            Button(this).apply {
+
+                text =
+                    "NRC"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "PHOTO",
+                        "NRC"
+                    )
+                }
+            }
+
+
+        val employmentButton =
+            Button(this).apply {
+
+                text =
+                    "Employment Card"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "PHOTO",
+                        "EMPLOYMENT_CARD"
+                    )
+                }
+            }
+
+
+        val chequeButton =
+            Button(this).apply {
+
+                text =
+                    "Cheque"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "PHOTO",
+                        "CHEQUE"
+                    )
+                }
+            }
+
+
+        val customButton =
+            Button(this).apply {
+
+                text =
+                    "Custom Photo"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "PHOTO",
+                        "CUSTOM"
+                    )
+                }
+            }
+
+
+        val backButton =
+            Button(this).apply {
+
+                text =
+                    "Back"
+
+
+                setOnClickListener {
+
+                    showReadyScreen(
+                        getCurrentStaffName()
+                    )
+                }
+            }
+
+
+        layout.addView(licenseButton)
+
+        layout.addView(nrcButton)
+
+        layout.addView(employmentButton)
+
+        layout.addView(chequeButton)
+
+        layout.addView(customButton)
+
+        layout.addView(backButton)
+
+
+        setContentView(layout)
+    }
+
+
+    /*
+     * =========================================================
+     * DOCUMENT SIZES
+     * =========================================================
+     */
+
+    private fun showDocumentSizes() {
+
+        val layout =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
+            }
+
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Select Document Size"
+
+                textSize =
+                    28f
+            }
+
+
+        layout.addView(title)
+
+
+        val a4Button =
+            Button(this).apply {
+
+                text =
+                    "A4"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "DOCUMENT",
+                        "A4"
+                    )
+                }
+            }
+
+
+        val legalButton =
+            Button(this).apply {
+
+                text =
+                    "Legal"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "DOCUMENT",
+                        "LEGAL"
+                    )
+                }
+            }
+
+
+        val a5Button =
+            Button(this).apply {
+
+                text =
+                    "A5"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "DOCUMENT",
+                        "A5"
+                    )
+                }
+            }
+
+
+        val b5Button =
+            Button(this).apply {
+
+                text =
+                    "B5"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "DOCUMENT",
+                        "B5"
+                    )
+                }
+            }
+
+
+        val customButton =
+            Button(this).apply {
+
+                text =
+                    "Custom Size"
+
+
+                setOnClickListener {
+
+                    selectCaptureType(
+                        "DOCUMENT",
+                        "CUSTOM"
+                    )
+                }
+            }
+
+
+        val backButton =
+            Button(this).apply {
+
+                text =
+                    "Back"
+
+
+                setOnClickListener {
+
+                    showReadyScreen(
+                        getCurrentStaffName()
+                    )
+                }
+            }
+
+
+        layout.addView(a4Button)
+
+        layout.addView(legalButton)
+
+        layout.addView(a5Button)
+
+        layout.addView(b5Button)
+
+        layout.addView(customButton)
+
+        layout.addView(backButton)
+
+
+        setContentView(layout)
+    }
+
+
+    /*
+     * =========================================================
+     * STORE CAPTURE TYPE
+     * =========================================================
+     */
+
+    private fun selectCaptureType(
+        type: String,
+        subType: String
+    ) {
+
+        captureType =
+            type
+
+        captureSubType =
+            subType
+
+        /*
+         * After selecting the document/photo type,
+         * ask for Color or Black & White.
+         */
+
+        showImageModeSelection()
+    }
+
+
+    /*
+     * =========================================================
+     * IMAGE MODE
+     * =========================================================
+     */
+
+    private fun showImageModeSelection() {
+
+        val layout =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
+            }
+
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Select Image Mode"
+
+                textSize =
+                    28f
+            }
+
+
+        val information =
+            TextView(this).apply {
+
+                text =
+                    "Choose how the captured image should be processed."
+
+                textSize =
+                    17f
+
+                setPadding(
+                    0,
+                    30,
+                    0,
+                    30
+                )
+            }
+
+
+        val selectionInfo =
+            TextView(this).apply {
+
+                text =
+                    "Type: ${captureType ?: "-"}\n" +
+                            "Selection: ${captureSubType ?: "-"}"
+
+                textSize =
+                    16f
+
+                setPadding(
+                    0,
+                    10,
+                    0,
+                    30
+                )
+            }
+
+
+        val colorButton =
+            Button(this).apply {
+
+                text =
+                    "Color"
+
+
+                setOnClickListener {
+
+                    imageMode =
+                        "COLOR"
+
+                    startCapture()
+                }
+            }
+
+
+        val blackWhiteButton =
+            Button(this).apply {
+
+                text =
+                    "Black & White"
+
+
+                setOnClickListener {
+
+                    imageMode =
+                        "BW"
+
+                    startCapture()
+                }
+            }
+
+
+        val backButton =
+            Button(this).apply {
+
+                text =
+                    "Back"
+
+
+                setOnClickListener {
+
+                    if (
+                        captureType ==
+                        "PHOTO"
+                    ) {
+
+                        showPhotoTypes()
+
+                    } else {
+
+                        showDocumentSizes()
+                    }
+                }
+            }
+
+
+        layout.addView(title)
+
+        layout.addView(information)
+
+        layout.addView(selectionInfo)
+
+        layout.addView(colorButton)
+
+        layout.addView(blackWhiteButton)
+
+        layout.addView(backButton)
+
+
+        setContentView(layout)
+    }
+
+
+    /*
+     * =========================================================
+     * CAPTURE SCREEN
+     * =========================================================
+     *
+     * Temporary screen.
+     *
+     * The real document camera will be implemented next.
+     */
+
+    private fun startCapture() {
+
+        val layout =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    40,
+                    80,
+                    40,
+                    40
+                )
+            }
+
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Capture"
+
+                textSize =
+                    28f
+            }
+
+
+        val information =
+            TextView(this).apply {
+
+                text =
+                    """
+                    Capture Type: ${captureType ?: "-"}
+
+                    Selection: ${captureSubType ?: "-"}
+
+                    Image Mode: ${
+                        if (imageMode == "BW")
+                            "Black & White"
+                        else
+                            "Color"
+                    }
+
+                    Camera capture will be implemented next.
+                    """.trimIndent()
+
+                textSize =
+                    18f
+
+                setPadding(
+                    0,
+                    40,
+                    0,
+                    40
+                )
+            }
+
+
+        val captureButton =
+            Button(this).apply {
+
+                text =
+                    "Open Camera"
+
+
+                setOnClickListener {
+
+                    /*
+                     * Real document/photo camera
+                     * will be implemented in the next phase.
+                     */
+
+                    information.text =
+                        "Camera module will be implemented next."
+                }
+            }
+
+
+        val backButton =
+            Button(this).apply {
+
+                text =
+                    "Back"
+
+
+                setOnClickListener {
+
+                    showImageModeSelection()
+                }
+            }
+
+
+        layout.addView(title)
+
+        layout.addView(information)
+
+        layout.addView(captureButton)
+
+        layout.addView(backButton)
+
+
+        setContentView(layout)
+    }
+
+
+    /*
+     * =========================================================
+     * STAFF NAME
+     * =========================================================
+     */
+
+    private fun getCurrentStaffName(): String {
+
+        return staffName ?: "Staff"
+    }
+
+
+    /*
+     * =========================================================
+     * LOGOUT
+     * =========================================================
+     */
 
     private fun logout() {
 
         /*
-         * Destroy authentication information
-         * from memory.
+         * Destroy all authentication information.
          */
+
         sessionToken =
             null
 
         captureToken =
+            null
+
+        staffName =
+            null
+
+
+        /*
+         * Destroy capture selection too.
+         */
+
+        captureType =
+            null
+
+        captureSubType =
+            null
+
+        imageMode =
             null
 
 
@@ -968,9 +1566,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    // ---------------------------------------------------------
-    // ACTIVITY CLEANUP
-    // ---------------------------------------------------------
+    /*
+     * =========================================================
+     * CLEANUP
+     * =========================================================
+     */
 
     override fun onDestroy() {
 
@@ -978,12 +1578,27 @@ class MainActivity : ComponentActivity() {
 
 
         /*
-         * Clear sensitive tokens.
+         * Never keep authentication tokens
+         * after the Activity is destroyed.
          */
+
         sessionToken =
             null
 
         captureToken =
+            null
+
+        staffName =
+            null
+
+
+        captureType =
+            null
+
+        captureSubType =
+            null
+
+        imageMode =
             null
 
 

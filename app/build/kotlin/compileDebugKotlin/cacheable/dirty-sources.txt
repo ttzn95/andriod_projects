@@ -1,0 +1,13 @@
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/CaptureType.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/DocumentSize.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/camera/CapturePreview.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/CaptureModels.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/ColorMode.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/SmartCaptureApi.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/OrientationMode.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/camera/DocumentCamera.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/CaptureSettings.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/ApiModels.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/MainActivity.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/ApiClient.kt
+/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/capture/PhotoType.kt

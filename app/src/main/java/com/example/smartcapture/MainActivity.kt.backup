@@ -1,8 +1,5 @@
 package com.example.smartcapture
 
-
-import okhttp3.MultipartBody
-import retrofit2.Retrofit
 import com.example.smartcapture.camera.CapturePreview
 import com.example.smartcapture.camera.DocumentCamera
 import com.example.smartcapture.capture.CaptureSettings
@@ -744,110 +741,12 @@ class MainActivity : ComponentActivity() {
         layout.addView(logoutButton)
 
         setContentView(layout)
-    }   
-
-    fun showCaptureError(message: String) {
-        capturePreview.showCaptureError(message)
-    }
-
-    // ---------------------------------------------------------
-    // UPLOAD CapturedImage
-    // ---------------------------------------------------------
-    fun uploadCapturedImage() {
-
-        val file = capturedImageFile
-
-        if (file == null) {
-            showCaptureError("No captured image available.")
-            return
-        }
-
-        val token = captureToken
-
-        if (token.isNullOrBlank()) {
-            showCaptureError("Capture session is not authenticated.")
-            return
-        }
-
-        CoroutineScope(Dispatchers.IO).launch {
-
-            try {
-
-                val tokenBody =
-                    RequestBody.create(
-                        MediaType.parse("text/plain"),
-                        token
-                    )
-
-                val mimeType =
-                    when (file.extension.lowercase()) {
-                        "jpg", "jpeg" -> "image/jpeg"
-                        "png" -> "image/png"
-                        "svg" -> "image/svg+xml"
-                        else -> "application/octet-stream"
-                    }
-
-                val imageBody =
-                    RequestBody.create(
-                        MediaType.parse(mimeType),
-                        file
-                    )
-
-                val imagePart =
-                    MultipartBody.Part.createFormData(
-                        "image",
-                        file.name,
-                        imageBody
-                    )
-
-                val response =
-                    ApiClient.api.uploadCapture(
-                        tokenBody,
-                        imagePart
-                    )
-
-                withContext(Dispatchers.Main) {
-
-                    if (response.isSuccessful) {
-
-                        val result = response.body()
-
-                        if (result?.success == true) {
-
-                            showCaptureCompleteScreen()
-
-                        } else {
-
-                            showCaptureError(
-                                result?.message
-                                    ?: "Upload failed"
-                            )
-                        }
-
-                    } else {
-
-                        showCaptureError(
-                            "Upload failed: HTTP ${response.code()}"
-                        )
-                    }
-                }
-
-            } catch (e: Exception) {
-
-                withContext(Dispatchers.Main) {
-
-                    showCaptureError(
-                        e.message
-                            ?: "Unable to upload image"
-                    )
-                }
-            }
-        }
     }
 
     // ---------------------------------------------------------
     // CAPTURE TYPE
     // ---------------------------------------------------------
+
     private fun showCaptureTypeScreen() {
 
         val layout = createVerticalLayout()
@@ -885,8 +784,6 @@ class MainActivity : ComponentActivity() {
 
         setContentView(layout)
     }
-
-
 
     // ---------------------------------------------------------
     // PHOTO TYPE
@@ -978,10 +875,10 @@ class MainActivity : ComponentActivity() {
         setContentView(layout)
     }
 
-
     // ---------------------------------------------------------
     // CUSTOM DOCUMENT SIZE
     // ---------------------------------------------------------
+
     private fun showCustomDocumentSizeScreen() {
 
         val layout =

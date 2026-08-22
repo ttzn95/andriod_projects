@@ -19,3 +19,11 @@ data class SessionResponse(
     val expires_at: String,
     val status: String
 )
+
+data class UploadResponse(
+    val success: Boolean,
+    val message: String,
+    val filename: String?,
+    val staff_id: String?,
+    val size: Int?
+)

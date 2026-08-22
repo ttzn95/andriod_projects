@@ -1,15 +1,16 @@
 package com.example.smartcapture
 
+import android.view.MotionEvent
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.InputType
-import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -18,18 +19,21 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+
 import com.example.smartcapture.api.ApiClient
 import com.example.smartcapture.api.LoginRequest
-import com.google.mlkit.vision.barcode.Barcode
+
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+
 import java.util.concurrent.Executors
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
 
 class MainActivity : ComponentActivity() {
 
@@ -293,7 +297,7 @@ class MainActivity : ComponentActivity() {
             val options =
                 BarcodeScannerOptions.Builder()
                     .setBarcodeFormats(
-                        Barcode.FORMAT_QR_CODE
+                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE
                     )
                     .build()
 

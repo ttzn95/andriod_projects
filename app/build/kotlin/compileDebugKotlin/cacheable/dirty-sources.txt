@@ -1,4 +1,0 @@
-/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/ApiModels.kt
-/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/MainActivity.kt
-/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/SmartCaptureApi.kt
-/workspaces/andriod_projects/app/src/main/java/com/example/smartcapture/api/ApiClient.kt

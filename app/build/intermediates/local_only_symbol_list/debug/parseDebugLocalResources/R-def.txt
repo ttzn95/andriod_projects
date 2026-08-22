@@ -1,3 +1,11 @@
 R_DEF: Internal format may change without notice
 local
+color sc_error
+color sc_ink
+color sc_muted
+color sc_outline
+color sc_panel
+color sc_paper
+color sc_signal
+color sc_system_bar
 style Theme.SmartCapture

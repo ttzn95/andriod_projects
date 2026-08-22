@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sc_ink">#FFF7F7F5</color>
+    <color name="sc_panel">#FFFFFFFF</color>
+    <color name="sc_paper">#FF17191C</color>
+    <color name="sc_muted">#FF62686D</color>
+    <color name="sc_signal">#FFC62828</color>
+    <color name="sc_outline">#FFE1D7D7</color>
+    <color name="sc_error">#FFC62828</color>
+    <color name="sc_system_bar">#FFF7F7F5</color>
+</resources>

@@ -84,6 +84,14 @@
     <color name="primary_text_disabled_material_light">#39000000</color>
     <color name="ripple_material_dark">#33ffffff</color>
     <color name="ripple_material_light">#1f000000</color>
+    <color name="sc_error">#FFC62828</color>
+    <color name="sc_ink">#FFF7F7F5</color>
+    <color name="sc_muted">#FF62686D</color>
+    <color name="sc_outline">#FFE1D7D7</color>
+    <color name="sc_panel">#FFFFFFFF</color>
+    <color name="sc_paper">#FF17191C</color>
+    <color name="sc_signal">#FFC62828</color>
+    <color name="sc_system_bar">#FFF7F7F5</color>
     <color name="secondary_text_default_material_dark">#b3ffffff</color>
     <color name="secondary_text_default_material_light">#8a000000</color>
     <color name="secondary_text_disabled_material_dark">#36ffffff</color>
@@ -1753,8 +1761,12 @@
         <item name="windowNoTitle">true</item>
     </style>
     <style name="Theme.SmartCapture" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:padding">24dp</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/sc_system_bar</item>
+        <item name="android:navigationBarColor">@color/sc_system_bar</item>
+        <item name="android:colorAccent">@color/sc_signal</item>
+        <item name="android:windowBackground">@color/sc_ink</item>
     </style>
     <style name="ThemeOverlay.AppCompat" parent="Base.ThemeOverlay.AppCompat"/>
     <style name="ThemeOverlay.AppCompat.ActionBar" parent="Base.ThemeOverlay.AppCompat.ActionBar"/>

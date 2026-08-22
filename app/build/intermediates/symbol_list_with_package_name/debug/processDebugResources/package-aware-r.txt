@@ -417,6 +417,14 @@ color primary_text_disabled_material_dark
 color primary_text_disabled_material_light
 color ripple_material_dark
 color ripple_material_light
+color sc_error
+color sc_ink
+color sc_muted
+color sc_outline
+color sc_panel
+color sc_paper
+color sc_signal
+color sc_system_bar
 color secondary_text_default_material_dark
 color secondary_text_default_material_light
 color secondary_text_disabled_material_dark

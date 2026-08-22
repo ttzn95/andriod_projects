@@ -15,6 +15,9 @@ import com.example.smartcapture.capture.PhotoType
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Typeface
 import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -32,6 +35,9 @@ import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.graphics.drawable.GradientDrawable
+import android.app.AlertDialog
+import com.google.gson.Gson
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -42,6 +48,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.example.smartcapture.api.ApiClient
 import com.example.smartcapture.api.LoginRequest
+import com.example.smartcapture.api.ApiError
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -54,6 +61,16 @@ import java.io.File
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
+
+    private val ink get() = getColor(R.color.sc_ink)
+    private val panel get() = getColor(R.color.sc_panel)
+    private val paper get() = getColor(R.color.sc_paper)
+    private val muted get() = getColor(R.color.sc_muted)
+    private val signal get() = getColor(R.color.sc_signal)
+    private val outline get() = getColor(R.color.sc_outline)
+    private val errorColor get() = getColor(R.color.sc_error)
+
+    private var uploadInProgress = false
 
     private lateinit var previewView: PreviewView
     private lateinit var statusText: TextView
@@ -101,26 +118,29 @@ class MainActivity : ComponentActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
+            setPadding(dp(28), dp(64), dp(28), dp(28))
+            setBackgroundColor(ink)
+            gravity = android.view.Gravity.CENTER
         }
 
         val title = TextView(this).apply {
             text = "Smart Capture"
-            textSize = 28f
+            textSize = 34f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(paper)
+            gravity = android.view.Gravity.CENTER
         }
 
         statusText = TextView(this).apply {
-            text = "Ready"
-            textSize = 18f
-            setPadding(0, 40, 0, 40)
+            text = "FIELD OPERATIONS  /  01\nREADY TO CAPTURE\nSecure document intake for your team"
+            textSize = 16f
+            setTextColor(muted)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(16), 0, dp(40))
         }
 
-        val scanButton = Button(this).apply {
-            text = "Scan QR Code"
-
-            setOnClickListener {
-                requestCameraPermission()
-            }
+        val scanButton = createButton("Scan QR Code") {
+            requestCameraPermission()
         }
 
         layout.addView(title)
@@ -179,19 +199,26 @@ class MainActivity : ComponentActivity() {
         // SQUARE QR FRAME
         // ---------------------------------------------------------
 
-        val qrFrameSize = 700
+        val qrFrameSize = dp(280)
+
+        val scanOverlay = ScanOverlay(this, qrFrameSize)
+        rootLayout.addView(
+            scanOverlay,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
 
         val qrFrame = View(this).apply {
 
-            background = android.graphics.drawable.GradientDrawable().apply {
+            background = GradientDrawable().apply {
 
-                setColor(
-                    android.graphics.Color.TRANSPARENT
-                )
+                setColor(Color.TRANSPARENT)
 
                 setStroke(
-                    5,
-                    android.graphics.Color.WHITE
+                    dp(3),
+                    signal
                 )
             }
         }
@@ -218,14 +245,11 @@ class MainActivity : ComponentActivity() {
         val scannerStatus =
             TextView(this).apply {
 
-                text =
-                    "Place the QR code inside the square"
+                text = "ALIGN QR CODE WITHIN THE FRAME"
 
                 textSize = 18f
 
-                setTextColor(
-                    android.graphics.Color.WHITE
-                )
+                setTextColor(Color.WHITE)
 
                 setGravity(
                     android.view.Gravity.CENTER
@@ -238,14 +262,7 @@ class MainActivity : ComponentActivity() {
                     20
                 )
 
-                setBackgroundColor(
-                    android.graphics.Color.argb(
-                        150,
-                        0,
-                        0,
-                        0
-                    )
-                )
+                setBackgroundColor(Color.argb(190, 15, 22, 28))
             }
 
         val statusParams =
@@ -274,35 +291,27 @@ class MainActivity : ComponentActivity() {
         // CANCEL BUTTON
         // ---------------------------------------------------------
 
-        val cancelButton =
-            Button(this).apply {
+        val cancelButton = createCameraButton("Close scanner") {
 
-                text = "Cancel"
+            val cameraProviderFuture =
+                ProcessCameraProvider.getInstance(
+                    this@MainActivity
+                )
 
-                isAllCaps = false
+            cameraProviderFuture.addListener({
 
-                setOnClickListener {
+                try {
 
-                    val cameraProviderFuture =
-                        ProcessCameraProvider.getInstance(
-                            this@MainActivity
-                        )
+                    cameraProviderFuture.get()
+                        .unbindAll()
 
-                    cameraProviderFuture.addListener({
-
-                        try {
-
-                            cameraProviderFuture.get()
-                                .unbindAll()
-
-                        } catch (_: Exception) {
-                        }
-
-                    }, ContextCompat.getMainExecutor(this@MainActivity))
-
-                    showMainScreen()
+                } catch (_: Exception) {
                 }
-            }
+
+            }, ContextCompat.getMainExecutor(this@MainActivity))
+
+            showMainScreen()
+        }
 
         val cancelParams =
             FrameLayout.LayoutParams(
@@ -371,6 +380,8 @@ class MainActivity : ComponentActivity() {
                     )
                     .build()
 
+                    var qrDetectionHandled = false
+
             imageAnalysis.setAnalyzer(
                 cameraExecutor
             ) { imageProxy ->
@@ -394,7 +405,36 @@ class MainActivity : ComponentActivity() {
                                 val value =
                                     barcode.rawValue
 
-                                if (!value.isNullOrBlank()) {
+                                val bounds = barcode.boundingBox
+                                val rotatedWidth =
+                                    if (imageProxy.imageInfo.rotationDegrees % 180 == 0) {
+                                        imageProxy.width
+                                    } else {
+                                        imageProxy.height
+                                    }
+                                val rotatedHeight =
+                                    if (imageProxy.imageInfo.rotationDegrees % 180 == 0) {
+                                        imageProxy.height
+                                    } else {
+                                        imageProxy.width
+                                    }
+                                val frameLeft =
+                                    (rotatedWidth - qrFrameSize * rotatedWidth / previewView.width) / 2f
+                                val frameTop =
+                                    (rotatedHeight - qrFrameSize * rotatedHeight / previewView.height) / 2f
+                                val frameRight = rotatedWidth - frameLeft
+                                val frameBottom = rotatedHeight - frameTop
+
+                                if (!qrDetectionHandled &&
+                                    !value.isNullOrBlank() &&
+                                    bounds != null &&
+                                    bounds.left >= frameLeft &&
+                                    bounds.top >= frameTop &&
+                                    bounds.right <= frameRight &&
+                                    bounds.bottom <= frameBottom
+                                ) {
+
+                                    qrDetectionHandled = true
 
                                     imageAnalysis.clearAnalyzer()
 
@@ -460,18 +500,25 @@ class MainActivity : ComponentActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
+            setPadding(dp(28), dp(56), dp(28), dp(28))
+            setBackgroundColor(ink)
+            gravity = android.view.Gravity.CENTER
         }
 
         val title = TextView(this).apply {
             text = "Staff Login"
-            textSize = 28f
+            textSize = 32f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(paper)
+            gravity = android.view.Gravity.CENTER
         }
 
         val information = TextView(this).apply {
-            text = "Enter your staff credentials"
+            text = "AUTHENTICATE TO CONTINUE\nUse the credentials assigned to your capture team."
             textSize = 17f
-            setPadding(0, 30, 0, 30)
+            setTextColor(muted)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(16), 0, dp(30))
         }
 
         val staffIdInput =
@@ -538,17 +585,36 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            styleInput(staffIdInput)
+            styleInput(passwordInput)
+
         val loginStatus =
             TextView(this).apply {
 
                 textSize = 16f
-                setPadding(0, 30, 0, 30)
+                setTextColor(muted)
+                setPadding(0, dp(20), 0, dp(20))
             }
 
         val loginButton =
             Button(this).apply {
 
                 text = "Login"
+                minHeight = dp(48)
+                minimumHeight = dp(48)
+                setCompoundDrawablesWithIntrinsicBounds(
+                    android.R.drawable.ic_menu_send,
+                    0,
+                    0,
+                    0
+                )
+                setCompoundDrawablePadding(dp(10))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = dp(8)
+                }
 
                 setOnClickListener {
 
@@ -560,16 +626,14 @@ class MainActivity : ComponentActivity() {
 
                     if (staffId.isEmpty()) {
 
-                        loginStatus.text =
-                            "Please enter Staff ID."
+                        showLoginError(loginStatus, "Please enter Staff ID.")
 
                         return@setOnClickListener
                     }
 
                     if (password.isEmpty()) {
 
-                        loginStatus.text =
-                            "Please enter password."
+                        showLoginError(loginStatus, "Please enter password.")
 
                         return@setOnClickListener
                     }
@@ -578,6 +642,7 @@ class MainActivity : ComponentActivity() {
 
                     loginStatus.text =
                         "Authenticating..."
+                    loginStatus.setTextColor(muted)
 
                     login(
                         staffId,
@@ -613,8 +678,7 @@ class MainActivity : ComponentActivity() {
 
         if (token.isNullOrBlank()) {
 
-            loginStatus.text =
-                "Session is missing. Please scan the QR again."
+            showLoginError(loginStatus, "Session is missing. Please scan the QR again.")
 
             loginButton.isEnabled = true
 
@@ -657,8 +721,7 @@ class MainActivity : ComponentActivity() {
 
                         } else {
 
-                            loginStatus.text =
-                                "Authentication failed."
+                            showLoginError(loginStatus, "Authentication failed. Please try again.")
                         }
 
                     } else {
@@ -666,16 +729,16 @@ class MainActivity : ComponentActivity() {
                         when (response.code()) {
 
                             401 ->
-                                loginStatus.text =
-                                    "Invalid Staff ID or password."
+                                showLoginError(
+                                    loginStatus,
+                                    getApiErrorMessage(response.errorBody()?.string())
+                                )
 
                             403 ->
-                                loginStatus.text =
-                                    "Staff is not authorized."
+                                showLoginError(loginStatus, "Staff is not authorized.")
 
                             else ->
-                                loginStatus.text =
-                                    "Server error: ${response.code()}"
+                                showLoginError(loginStatus, "Server error: ${response.code()}")
                         }
                     }
                 }
@@ -686,8 +749,7 @@ class MainActivity : ComponentActivity() {
 
                     loginButton.isEnabled = true
 
-                    loginStatus.text =
-                        "Unable to connect to server."
+                    showLoginError(loginStatus, "Unable to connect to server.")
                 }
             }
         }
@@ -703,41 +765,35 @@ class MainActivity : ComponentActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
+            setPadding(dp(28), dp(56), dp(28), dp(28))
+            setBackgroundColor(ink)
+            gravity = android.view.Gravity.CENTER
         }
 
         val title = TextView(this).apply {
             text = "Smart Capture"
-            textSize = 28f
+            textSize = 32f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(paper)
+            gravity = android.view.Gravity.CENTER
         }
 
         val status = TextView(this).apply {
             text =
                 "Authentication successful\n\nWelcome, $staffName"
             textSize = 18f
-            setPadding(0, 40, 0, 40)
+            setTextColor(muted)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(32), 0, dp(40))
         }
 
-        val captureButton =
-            Button(this).apply {
+        val captureButton = createButton("Start Capture") {
+            showCaptureTypeScreen()
+        }
 
-                text = "Start Capture"
-
-                setOnClickListener {
-
-                    showCaptureTypeScreen()
-                }
-            }
-
-        val logoutButton =
-            Button(this).apply {
-
-                text = "Logout"
-
-                setOnClickListener {
-                    logout()
-                }
-            }
+        val logoutButton = createButton("Logout") {
+            logout()
+        }
 
         layout.addView(title)
         layout.addView(status)
@@ -756,6 +812,10 @@ class MainActivity : ComponentActivity() {
     // ---------------------------------------------------------
     fun uploadCapturedImage() {
 
+        if (uploadInProgress) {
+            return
+        }
+
         val file = capturedImageFile
 
         if (file == null) {
@@ -769,6 +829,8 @@ class MainActivity : ComponentActivity() {
             showCaptureError("Capture session is not authenticated.")
             return
         }
+
+        uploadInProgress = true
 
         CoroutineScope(Dispatchers.IO).launch {
 
@@ -815,10 +877,11 @@ class MainActivity : ComponentActivity() {
 
                         if (result?.success == true) {
 
-                            showCaptureCompleteScreen()
+                            showUploadCompleteDialog()
 
                         } else {
 
+                            uploadInProgress = false
                             showCaptureError(
                                 result?.message
                                     ?: "Upload failed"
@@ -827,8 +890,11 @@ class MainActivity : ComponentActivity() {
 
                     } else {
 
+                        uploadInProgress = false
                         showCaptureError(
-                            "Upload failed: HTTP ${response.code()}"
+                            getApiErrorMessage(
+                                response.errorBody()?.string()
+                            )
                         )
                     }
                 }
@@ -837,6 +903,7 @@ class MainActivity : ComponentActivity() {
 
                 withContext(Dispatchers.Main) {
 
+                    uploadInProgress = false
                     showCaptureError(
                         e.message
                             ?: "Unable to upload image"
@@ -844,6 +911,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun showLoginError(status: TextView, message: String) {
+        status.setTextColor(errorColor)
+        status.text = message
+    }
+
+    private fun getApiErrorMessage(errorBody: String?): String {
+        val detail = try {
+            errorBody?.let { Gson().fromJson(it, ApiError::class.java).detail }
+        } catch (_: Exception) {
+            null
+        }
+
+        return detail ?: "Request failed. Please try again."
+    }
+
+    private fun showUploadCompleteDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Upload complete")
+            .setMessage("Your captured image was uploaded successfully.")
+            .setPositiveButton("Continue") { _, _ ->
+                showCaptureCompleteScreen()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     // ---------------------------------------------------------
@@ -1012,6 +1105,9 @@ class MainActivity : ComponentActivity() {
                             InputType.TYPE_NUMBER_FLAG_DECIMAL
             }
 
+                    styleInput(widthInput)
+                    styleInput(heightInput)
+
         val continueButton =
         createButton("Continue") {
 
@@ -1076,7 +1172,7 @@ class MainActivity : ComponentActivity() {
 
         val colorButton =
             createSelectionButton(
-                icon = "🌈",
+                iconRes = android.R.drawable.ic_menu_gallery,
                 title = "Color",
                 selected =
                     captureSettings.colorMode ==
@@ -1091,7 +1187,7 @@ class MainActivity : ComponentActivity() {
 
         val blackWhiteButton =
             createSelectionButton(
-                icon = "◐",
+                iconRes = android.R.drawable.ic_menu_view,
                 title = "Black & White",
                 selected =
                     captureSettings.colorMode ==
@@ -1108,10 +1204,10 @@ class MainActivity : ComponentActivity() {
             colorButton,
             LinearLayout.LayoutParams(
                 0,
-                180,
+                dp(132),
                 1f
             ).apply {
-                setMargins(0, 0, 10, 0)
+                setMargins(0, 0, dp(6), dp(12))
             }
         )
 
@@ -1119,10 +1215,10 @@ class MainActivity : ComponentActivity() {
             blackWhiteButton,
             LinearLayout.LayoutParams(
                 0,
-                180,
+                dp(132),
                 1f
             ).apply {
-                setMargins(10, 0, 0, 0)
+                setMargins(dp(6), 0, 0, dp(12))
             }
         )
 
@@ -1144,7 +1240,7 @@ class MainActivity : ComponentActivity() {
 
         val portraitButton =
             createSelectionButton(
-                icon = "▯",
+                iconRes = android.R.drawable.ic_menu_crop,
                 title = "Portrait",
                 selected =
                     captureSettings.orientation ==
@@ -1159,7 +1255,7 @@ class MainActivity : ComponentActivity() {
 
         val landscapeButton =
             createSelectionButton(
-                icon = "▭",
+                iconRes = android.R.drawable.ic_menu_rotate,
                 title = "Landscape",
                 selected =
                     captureSettings.orientation ==
@@ -1176,10 +1272,10 @@ class MainActivity : ComponentActivity() {
             portraitButton,
             LinearLayout.LayoutParams(
                 0,
-                180,
+                dp(132),
                 1f
             ).apply {
-                setMargins(0, 0, 10, 0)
+                setMargins(0, 0, dp(6), dp(12))
             }
         )
 
@@ -1187,10 +1283,10 @@ class MainActivity : ComponentActivity() {
             landscapeButton,
             LinearLayout.LayoutParams(
                 0,
-                180,
+                dp(132),
                 1f
             ).apply {
-                setMargins(10, 0, 0, 0)
+                setMargins(dp(6), 0, 0, dp(12))
             }
         )
 
@@ -1255,7 +1351,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun createSelectionButton(
-        icon: String,
+        iconRes: Int,
         title: String,
         selected: Boolean,
         onClick: () -> Unit
@@ -1264,11 +1360,16 @@ class MainActivity : ComponentActivity() {
         val button =
             Button(this).apply {
 
-                text = "$icon\n$title"
+                text = title
 
                 textSize = 16f
 
                 isAllCaps = false
+                gravity = android.view.Gravity.CENTER
+                setCompoundDrawablePadding(dp(8))
+                val icon = getDrawable(iconRes)?.mutate()
+                icon?.setTint(if (selected) ink else paper)
+                setCompoundDrawablesWithIntrinsicBounds(null, icon, null, null)
 
                 setOnClickListener {
                     onClick()
@@ -1279,17 +1380,37 @@ class MainActivity : ComponentActivity() {
 
             button.alpha = 1.0f
 
-            button.setBackgroundColor(
-                android.graphics.Color.rgb(
-                    210,
-                    230,
-                    255
-                )
-            )
+            button.setTextColor(ink)
+            button.background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(signal)
+            }
 
         } else {
 
             button.alpha = 0.65f
+            button.setTextColor(paper)
+            button.background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(panel)
+                setStroke(dp(1), outline)
+            }
+        }
+
+        button.compoundDrawables.forEach { drawable ->
+            drawable?.setTint(if (selected) ink else paper)
+        }
+
+        button.setOnTouchListener { view, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN ->
+                    view.animate().scaleX(0.97f).scaleY(0.97f).alpha(0.88f)
+                        .setDuration(190).start()
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    view.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                        .setDuration(280).start()
+            }
+            false
         }
 
         return button
@@ -1332,6 +1453,7 @@ class MainActivity : ComponentActivity() {
                 captureSettings = captureSettings,
 
                 onImageCaptured = { file ->
+                    capturedImageFile = file
                     capturePreview.showImagePreview(file)
                 },
 
@@ -1360,11 +1482,13 @@ class MainActivity : ComponentActivity() {
                 LinearLayout.VERTICAL
 
             setPadding(
-                40,
-                40,
-                40,
-                40
+                dp(24),
+                dp(44),
+                dp(24),
+                dp(24)
             )
+            setBackgroundColor(ink)
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
         }
     }
 
@@ -1380,13 +1504,16 @@ class MainActivity : ComponentActivity() {
 
             text = textValue
 
-            textSize = 28f
+            textSize = 30f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(paper)
+            gravity = android.view.Gravity.CENTER
 
             setPadding(
                 0,
                 0,
                 0,
-                30
+                dp(28)
             )
         }
     }
@@ -1407,11 +1534,128 @@ class MainActivity : ComponentActivity() {
             isAllCaps = false
 
             textSize = 16f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(if (textValue.startsWith("Back") || textValue == "Retake") muted else ink)
+            minHeight = dp(48)
+            minimumHeight = dp(48)
+            setPadding(dp(16), dp(4), dp(16), dp(4))
+            stateListAnimator = null
+            elevation = dp(2).toFloat()
+            gravity = android.view.Gravity.CENTER
+            setCompoundDrawablePadding(dp(10))
+            setCompoundDrawablesWithIntrinsicBounds(
+                iconForButton(textValue),
+                0,
+                0,
+                0
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(14)
+            }
+
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(if (textValue.startsWith("Back") || textValue == "Retake") panel else signal)
+                if (textValue.startsWith("Back") || textValue == "Retake") {
+                    setStroke(dp(1), outline)
+                }
+            }
 
             setOnClickListener {
 
                 onClick()
             }
+
+            setOnTouchListener { view, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        view.animate().scaleX(0.97f).scaleY(0.97f).alpha(0.88f)
+                            .setDuration(190).start()
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        view.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                            .setDuration(280).start()
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun iconForButton(textValue: String): Int {
+        return when {
+            textValue.contains("Scan") -> android.R.drawable.ic_menu_camera
+            textValue.contains("Login") -> android.R.drawable.ic_menu_send
+            textValue.contains("Capture") -> android.R.drawable.ic_menu_camera
+            textValue.contains("Confirm") -> android.R.drawable.ic_menu_upload
+            textValue.contains("Continue") -> android.R.drawable.ic_media_next
+            textValue.contains("Retake") -> android.R.drawable.ic_menu_rotate
+            textValue.contains("Back") -> android.R.drawable.ic_media_previous
+            textValue.contains("Close") || textValue.contains("Cancel") ->
+                android.R.drawable.ic_menu_close_clear_cancel
+            textValue.contains("Logout") -> android.R.drawable.ic_lock_power_off
+            textValue.contains("Try Again") -> android.R.drawable.ic_popup_sync
+            textValue.contains("Photos") -> android.R.drawable.ic_menu_gallery
+            textValue.contains("Documents") -> android.R.drawable.ic_menu_agenda
+            else -> android.R.drawable.ic_menu_manage
+        }
+    }
+
+    private fun styleInput(input: EditText) {
+        input.setTextColor(paper)
+        input.setHintTextColor(muted)
+        input.setPadding(dp(16), dp(14), dp(16), dp(14))
+        input.background = GradientDrawable().apply {
+            cornerRadius = dp(14).toFloat()
+            setColor(panel)
+            setStroke(dp(1), outline)
+        }
+    }
+
+    private class ScanOverlay(
+        context: android.content.Context,
+        private val scanSize: Int
+    ) : View(context) {
+
+        private val maskPaint = android.graphics.Paint().apply {
+            color = Color.argb(190, 0, 0, 0)
+        }
+
+        private val guidePaint = android.graphics.Paint().apply {
+            color = Color.rgb(185, 235, 86)
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 6f
+            strokeCap = android.graphics.Paint.Cap.SQUARE
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+
+            val left = (width - scanSize) / 2f
+            val top = (height - scanSize) / 2f
+            val right = left + scanSize
+            val bottom = top + scanSize
+
+            canvas.drawRect(0f, 0f, width.toFloat(), top, maskPaint)
+            canvas.drawRect(0f, top, left, bottom, maskPaint)
+            canvas.drawRect(right, top, width.toFloat(), bottom, maskPaint)
+            canvas.drawRect(0f, bottom, width.toFloat(), height.toFloat(), maskPaint)
+
+            val corner = scanSize * 0.14f
+            canvas.drawLine(left, top, left + corner, top, guidePaint)
+            canvas.drawLine(left, top, left, top + corner, guidePaint)
+            canvas.drawLine(right, top, right - corner, top, guidePaint)
+            canvas.drawLine(right, top, right, top + corner, guidePaint)
+            canvas.drawLine(left, bottom, left + corner, bottom, guidePaint)
+            canvas.drawLine(left, bottom, left, bottom - corner, guidePaint)
+            canvas.drawLine(right, bottom, right - corner, bottom, guidePaint)
+            canvas.drawLine(right, bottom, right, bottom - corner, guidePaint)
         }
     }
 

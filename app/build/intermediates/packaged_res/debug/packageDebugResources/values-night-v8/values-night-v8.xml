@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sc_error">#FFFF6B78</color>
+    <color name="sc_ink">#FF0B1220</color>
+    <color name="sc_muted">#FFA8B9D4</color>
+    <color name="sc_outline">#FF2E4770</color>
+    <color name="sc_panel">#FF14233D</color>
+    <color name="sc_paper">#FFF0F5FF</color>
+    <color name="sc_signal">#FF4D8DFF</color>
+    <color name="sc_system_bar">#FF0B1220</color>
+    <style name="Theme.SmartCapture" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/sc_system_bar</item>
+        <item name="android:navigationBarColor">@color/sc_system_bar</item>
+        <item name="android:colorAccent">@color/sc_signal</item>
+        <item name="android:windowBackground">@color/sc_ink</item>
+    </style>
+</resources>

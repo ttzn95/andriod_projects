@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SmartCapture" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/sc_system_bar</item>
+        <item name="android:navigationBarColor">@color/sc_system_bar</item>
+        <item name="android:colorAccent">@color/sc_signal</item>
+        <item name="android:windowBackground">@color/sc_ink</item>
+    </style>
+</resources>

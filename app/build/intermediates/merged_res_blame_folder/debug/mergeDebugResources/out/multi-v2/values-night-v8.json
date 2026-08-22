@@ -11,6 +11,49 @@
                         "startOffsets": "55,125,209,293,389,491,593,687",
                         "endColumns": "69,83,83,95,101,101,93,88",
                         "endOffsets": "120,204,288,384,486,588,682,771"
+                    },
+                    "to": {
+                        "startLines": "10,11,12,13,14,15,16,25",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "421,491,575,659,755,857,959,1555",
+                        "endColumns": "69,83,83,95,101,101,93,88",
+                        "endOffsets": "486,570,654,750,852,954,1048,1639"
+                    }
+                },
+                {
+                    "source": "/workspaces/andriod_projects/app/src/main/res/values-night/styles.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "9",
+                        "endColumns": "12",
+                        "endOffsets": "552"
+                    },
+                    "to": {
+                        "startLines": "17",
+                        "startColumns": "4",
+                        "startOffsets": "1053",
+                        "endLines": "24",
+                        "endColumns": "12",
+                        "endOffsets": "1550"
+                    }
+                },
+                {
+                    "source": "/workspaces/andriod_projects/app/src/main/res/values-night/colors.xml",
+                    "from": {
+                        "startLines": "8,2,5,7,3,4,6,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "326,55,188,279,98,143,233,371",
+                        "endColumns": "44,42,44,46,44,44,45,49",
+                        "endOffsets": "366,93,228,321,138,183,274,416"
+                    },
+                    "to": {
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,100,143,188,235,280,325,371",
+                        "endColumns": "44,42,44,46,44,44,45,49",
+                        "endOffsets": "95,138,183,230,275,320,366,416"
                     }
                 }
             ]

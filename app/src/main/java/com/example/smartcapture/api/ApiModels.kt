@@ -27,3 +27,7 @@ data class UploadResponse(
     val staff_id: String?,
     val size: Int?
 )
+
+data class ApiError(
+    val detail: String?
+)

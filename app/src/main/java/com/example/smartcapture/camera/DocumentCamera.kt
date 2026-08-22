@@ -15,6 +15,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.example.smartcapture.capture.CaptureSettings
+import com.example.smartcapture.capture.CaptureType
 import com.example.smartcapture.capture.OrientationMode 
 import android.widget.Button
 import com.example.smartcapture.MainActivity
@@ -59,40 +60,16 @@ class DocumentCamera(
             PreviewView(activity).apply {
 
                 scaleType =
-                    PreviewView.ScaleType.FILL_CENTER
+                    PreviewView.ScaleType.FIT_CENTER
 
                 implementationMode =
                     PreviewView.ImplementationMode.COMPATIBLE
             }
 
-        val frameWidthDp: Int
-        val frameHeightDp: Int
-
-        if (
-            captureSettings.orientation ==
-            OrientationMode.LANDSCAPE
-        ) {
-
-            frameWidthDp = 320
-            frameHeightDp = 210
-
-        } else {
-
-            frameWidthDp = 240
-            frameHeightDp = 320
-        }
-
-        val density =
-            activity.resources.displayMetrics.density
-
-        val frameWidth =
-            (frameWidthDp * density).toInt()
-
-        val frameHeight =
-            (frameHeightDp * density).toInt()
+        val aspectRatio = getCaptureAspectRatio()
 
         val captureFrame =
-            FrameLayout(activity).apply {
+            AspectRatioFrameLayout(activity, aspectRatio).apply {
 
                 setBackgroundColor(
                     Color.BLACK
@@ -140,8 +117,8 @@ class DocumentCamera(
 
         val frameParams =
             LinearLayout.LayoutParams(
-                frameWidth,
-                frameHeight
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
 
                 gravity =
@@ -149,9 +126,9 @@ class DocumentCamera(
 
                 setMargins(
                     0,
-                    20,
                     0,
-                    20
+                    0,
+                    0
                 )
             }
 
@@ -314,6 +291,41 @@ class DocumentCamera(
             }
 
         }, ContextCompat.getMainExecutor(activity))
+    }
+
+    private fun getCaptureAspectRatio(): Float {
+        val landscape = captureSettings.orientation == OrientationMode.LANDSCAPE
+
+        return if (captureSettings.captureType == CaptureType.PHOTO) {
+            if (landscape) 4f / 3f else 3f / 4f
+        } else {
+            if (landscape) 16f / 9f else 9f / 16f
+        }
+    }
+
+    private class AspectRatioFrameLayout(
+        context: android.content.Context,
+        private val aspectRatio: Float
+    ) : FrameLayout(context) {
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val maxWidth = MeasureSpec.getSize(widthMeasureSpec)
+            val maxHeight = MeasureSpec.getSize(heightMeasureSpec)
+            var measuredWidth = maxWidth
+            var measuredHeight = (measuredWidth / aspectRatio).toInt()
+
+            if (maxHeight > 0 && measuredHeight > maxHeight) {
+                measuredHeight = maxHeight
+                measuredWidth = (measuredHeight * aspectRatio).toInt()
+            }
+
+            setMeasuredDimension(measuredWidth, measuredHeight)
+            val childWidthSpec = MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY)
+            val childHeightSpec = MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
+            for (index in 0 until childCount) {
+                getChildAt(index).measure(childWidthSpec, childHeightSpec)
+            }
+        }
     }
 
     private fun captureImage() { 

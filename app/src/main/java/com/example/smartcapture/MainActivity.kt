@@ -1504,241 +1504,82 @@ class MainActivity : ComponentActivity() {
     // COLOR MODE
     // ---------------------------------------------------------
     fun showColorModeScreen() {
-
-        val layout = createVerticalLayout()
-        layout.setPadding(dp(24), dp(18), dp(24), dp(16))
-
-        layout.addView(
-            createTitle("Capture Settings")
-        )
-
-        if (captureSettings.captureType == CaptureType.PHOTO) {
-            layout.addView(createTitle("Photo Side"))
-
-            val sideLayout = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 8, 0, 8)
-            }
-
-            val frontButton = createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_camera,
-                title = "Front",
-                selected = captureSettings.photoSide == PhotoSide.FRONT
-            ) {
-                captureSettings.photoSide = PhotoSide.FRONT
-                showColorModeScreen()
-            }
-
-            val backButton = createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_camera,
-                title = "Back",
-                selected = captureSettings.photoSide == PhotoSide.BACK
-            ) {
-                captureSettings.photoSide = PhotoSide.BACK
-                showColorModeScreen()
-            }
-
-            sideLayout.addView(frontButton, LinearLayout.LayoutParams(0, dp(92), 1f).apply {
-                setMargins(0, 0, dp(6), dp(6))
-            })
-            sideLayout.addView(backButton, LinearLayout.LayoutParams(0, dp(92), 1f).apply {
-                setMargins(dp(6), 0, 0, dp(6))
-            })
-            layout.addView(sideLayout)
+        val layout = createVerticalLayout().apply {
+            setPadding(dp(24), dp(18), dp(24), dp(16))
         }
 
-        // ---------------------------------------------------------
-        // COLOR MODE
-        // ---------------------------------------------------------
+        layout.addView(createTitle("Capture Settings"))
 
-        layout.addView(
-            createTitle("Color Mode")
-        )
-
-        val colorLayout =
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 8, 0, 8)
-            }
-
-        val colorButton =
-            createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_gallery,
-                title = "Color",
-                selected =
-                    captureSettings.colorMode ==
-                            ColorMode.COLOR
-            ) {
-
-                captureSettings.colorMode =
-                    ColorMode.COLOR
-
-                showColorModeScreen()
-            }
-
-        val blackWhiteButton =
-            createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_view,
-                title = "Black & White",
-                selected =
-                    captureSettings.colorMode ==
-                            ColorMode.BLACK_WHITE
-            ) {
-
-                captureSettings.colorMode =
-                    ColorMode.BLACK_WHITE
-
-                showColorModeScreen()
-            }
-
-        colorLayout.addView(
-            colorButton,
-            LinearLayout.LayoutParams(
-                0,
-                dp(92),
-                1f
-            ).apply {
-                setMargins(0, 0, dp(6), dp(6))
-            }
-        )
-
-        colorLayout.addView(
-            blackWhiteButton,
-            LinearLayout.LayoutParams(
-                0,
-                dp(92),
-                1f
-            ).apply {
-                setMargins(dp(6), 0, 0, dp(6))
-            }
-        )
-
+        val colorLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val colorButton = createSelectionButton(
+            android.R.drawable.ic_menu_gallery,
+            "Color",
+            captureSettings.colorMode == ColorMode.COLOR
+        ) {
+            captureSettings.colorMode = ColorMode.COLOR
+            showColorModeScreen()
+        }
+        val blackWhiteButton = createSelectionButton(
+            android.R.drawable.ic_menu_view,
+            "Black & White",
+            captureSettings.colorMode == ColorMode.BLACK_WHITE
+        ) {
+            captureSettings.colorMode = ColorMode.BLACK_WHITE
+            showColorModeScreen()
+        }
+        colorLayout.addView(colorButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+        colorLayout.addView(blackWhiteButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+        layout.addView(createTitle("Color Mode"))
         layout.addView(colorLayout)
 
-        // ---------------------------------------------------------
-        // ORIENTATION
-        // ---------------------------------------------------------
-
-        layout.addView(
-            createTitle("Orientation")
-        )
-
-        val orientationLayout =
-            LinearLayout(this).apply {
+        if (captureSettings.captureType == CaptureType.DOCUMENT) {
+            val orientationLayout = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 8, 0, 8)
             }
-
-        val portraitButton =
-            createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_crop,
-                title = "Portrait",
-                selected =
-                    captureSettings.orientation ==
-                            OrientationMode.PORTRAIT
+            val portraitButton = createSelectionButton(
+                android.R.drawable.ic_menu_crop,
+                "Portrait",
+                captureSettings.orientation == OrientationMode.PORTRAIT
             ) {
-
-                captureSettings.orientation =
-                    OrientationMode.PORTRAIT
-
+                captureSettings.orientation = OrientationMode.PORTRAIT
                 showColorModeScreen()
             }
-
-        val landscapeButton =
-            createSelectionButton(
-                iconRes = android.R.drawable.ic_menu_rotate,
-                title = "Landscape",
-                selected =
-                    captureSettings.orientation ==
-                            OrientationMode.LANDSCAPE
+            val landscapeButton = createSelectionButton(
+                android.R.drawable.ic_menu_rotate,
+                "Landscape",
+                captureSettings.orientation == OrientationMode.LANDSCAPE
             ) {
-
-                captureSettings.orientation =
-                    OrientationMode.LANDSCAPE
-
+                captureSettings.orientation = OrientationMode.LANDSCAPE
                 showColorModeScreen()
             }
+            orientationLayout.addView(portraitButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+            orientationLayout.addView(landscapeButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+            layout.addView(createTitle("Orientation"))
+            layout.addView(orientationLayout)
+        } else {
+            captureSettings.orientation = OrientationMode.PORTRAIT
+        }
 
-        orientationLayout.addView(
-            portraitButton,
-            LinearLayout.LayoutParams(
-                0,
-                dp(92),
-                1f
-            ).apply {
-                setMargins(0, 0, dp(6), dp(6))
+        layout.addView(TextView(this).apply {
+            text = if (captureSettings.captureType == CaptureType.PHOTO) {
+                "Color: ${getColorModeDisplayName()}"
+            } else {
+                "Color: ${getColorModeDisplayName()}\n" +
+                        "Orientation: ${getOrientationDisplayName()}"
             }
-        )
-
-        orientationLayout.addView(
-            landscapeButton,
-            LinearLayout.LayoutParams(
-                0,
-                dp(92),
-                1f
-            ).apply {
-                setMargins(dp(6), 0, 0, dp(6))
+            textSize = 16f
+            setPadding(0, dp(12), 0, dp(12))
+        })
+        layout.addView(createButton("Continue →") { startDocumentCamera() })
+        layout.addView(createButton("Back") {
+            if (captureSettings.captureType == CaptureType.PHOTO) {
+                showPhotoTypeScreen()
+            } else {
+                showDocumentSizeScreen()
             }
-        )
-
-        layout.addView(orientationLayout)
-
-        // ---------------------------------------------------------
-        // CURRENT SELECTION
-        // ---------------------------------------------------------
-
-        val selectedText =
-            TextView(this).apply {
-
-                text =
-                    "Photo Side: ${getPhotoSideDisplayName()}\n" +
-                    "Color: ${getColorModeDisplayName()}\n" +
-                    "Orientation: ${getOrientationDisplayName()}"
-
-                textSize = 16f
-
-                setPadding(
-                    0,
-                    20,
-                    0,
-                    20
-                )
-            }
-
-        layout.addView(selectedText)
-
-        // ---------------------------------------------------------
-        // CONTINUE
-        // ---------------------------------------------------------
-
-        layout.addView(
-            createButton("Continue →") {
-
-                startDocumentCamera()
-            }
-        )
-
-        // ---------------------------------------------------------
-        // BACK
-        // ---------------------------------------------------------
-
-        layout.addView(
-            createButton("Back") {
-
-                if (
-                    captureSettings.captureType ==
-                    CaptureType.PHOTO
-                ) {
-
-                    showPhotoTypeScreen()
-
-                } else {
-
-                    showDocumentSizeScreen()
-                }
-            }
-        )
-
+        })
         setContentView(layout)
     }
 
@@ -2105,6 +1946,15 @@ class MainActivity : ComponentActivity() {
         onClick: () -> Unit
         ): Button {
         return createButton(text, onClick)
+    }
+
+    fun createCameraSelectionButton(
+        iconRes: Int,
+        title: String,
+        selected: Boolean,
+        onClick: () -> Unit
+    ): Button {
+        return createSelectionButton(iconRes, title, selected, onClick)
     }
 
     // ---------------------------------------------------------

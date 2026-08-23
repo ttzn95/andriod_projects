@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import com.example.smartcapture.capture.CaptureSettings
 import com.example.smartcapture.capture.CaptureType
 import com.example.smartcapture.capture.OrientationMode 
+import com.example.smartcapture.capture.PhotoSide
 import android.widget.Button
 import com.example.smartcapture.MainActivity
 import java.io.File
@@ -197,6 +198,44 @@ class DocumentCamera(
                 1f
             )
         )
+
+        if (captureSettings.captureType == CaptureType.PHOTO) {
+            if (captureSettings.photoSide == null) {
+                captureSettings.photoSide = PhotoSide.FRONT
+            }
+
+            val sideLayout = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+            val frontButton = activity.createCameraSelectionButton(
+                android.R.drawable.ic_menu_camera,
+                "Front",
+                captureSettings.photoSide == PhotoSide.FRONT
+            ) {
+                captureSettings.photoSide = PhotoSide.FRONT
+                stopCamera()
+                start()
+            }
+            val backButton = activity.createCameraSelectionButton(
+                android.R.drawable.ic_menu_camera,
+                "Back",
+                captureSettings.photoSide == PhotoSide.BACK
+            ) {
+                captureSettings.photoSide = PhotoSide.BACK
+                stopCamera()
+                start()
+            }
+            sideLayout.addView(
+                frontButton,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            sideLayout.addView(
+                backButton,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            rootLayout.addView(sideLayout)
+        }
 
         val captureButton =
             activity.createCameraButton("Capture") {

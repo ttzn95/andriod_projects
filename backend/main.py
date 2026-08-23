@@ -41,6 +41,8 @@ def generate_qr_base64(data: str) -> str:
 sessions = {}
 captures = {}
 UPLOAD_DIR = "uploads"
+QR_SESSION_MINUTES = 5
+AUTHENTICATED_SESSION_MINUTES = 30
 
 os.makedirs(
     UPLOAD_DIR,
@@ -76,7 +78,7 @@ def create_session():
     session_token = token_urlsafe(32)
 
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(minutes=5)
+    expires_at = now + timedelta(minutes=QR_SESSION_MINUTES)
 
     # Store session in memory
     sessions[session_token] = {
@@ -162,6 +164,7 @@ def login(request: LoginRequest):
     session["status"] = "AUTHENTICATED"
     session["staff_id"] = request.staff_id
     session["capture_token"] = capture_token
+    session["expires_at"] = now + timedelta(minutes=AUTHENTICATED_SESSION_MINUTES)
 
     return {
         "success": True,

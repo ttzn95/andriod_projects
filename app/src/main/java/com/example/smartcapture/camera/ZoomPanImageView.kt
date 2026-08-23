@@ -67,6 +67,12 @@ class ZoomPanImageView @JvmOverloads constructor(
     fun zoomIn() = setScale(currentScale * 1.25f, width / 2f, height / 2f)
     fun zoomOut() = setScale(currentScale / 1.25f, width / 2f, height / 2f)
 
+    fun rotateClockwise() {
+        imageMatrixState.postRotate(90f, width / 2f, height / 2f)
+        constrainMatrix()
+        imageMatrix = imageMatrixState
+    }
+
     private fun setScale(target: Float, focusX: Float, focusY: Float) {
         val bounded = target.coerceIn(minimumScale, minimumScale * 4f)
         val factor = bounded / currentScale
@@ -116,11 +122,13 @@ class ZoomPanImageView @JvmOverloads constructor(
         return true
     }
 
-    fun createVisibleCrop(): Bitmap? {
+    fun createVisibleCrop(): Bitmap? = createCrop(RectF(0f, 0f, width.toFloat(), height.toFloat()))
+
+    fun createCrop(viewRect: RectF): Bitmap? {
         val source = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return null
         val inverse = Matrix()
         if (!imageMatrixState.invert(inverse)) return null
-        val crop = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        val crop = RectF(viewRect)
         inverse.mapRect(crop)
         val left = max(0, crop.left.toInt())
         val top = max(0, crop.top.toInt())

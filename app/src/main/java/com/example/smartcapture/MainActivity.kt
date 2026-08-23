@@ -1296,20 +1296,16 @@ class MainActivity : ComponentActivity() {
         layout.addView(title)
 
         val photoButton =
-            createButton("Photos") {
-
+            createButton("Photos") { 
                 captureSettings.captureType =    CaptureType.PHOTO
-                clearPageImages()
-
+                clearPageImages() 
                 showPhotoTypeScreen()
             }
 
         val documentButton =
-            createButton("Documents") {
-
+            createButton("Documents") { 
                 captureSettings.captureType =    CaptureType.DOCUMENT
-                clearPageImages()
-
+                clearPageImages()  
                 showDocumentSizeScreen()
             }
 
@@ -1529,7 +1525,9 @@ class MainActivity : ComponentActivity() {
             captureSettings.colorMode = ColorMode.BLACK_WHITE
             showColorModeScreen()
         }
-        colorLayout.addView(colorButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+        colorLayout.addView(colorButton, LinearLayout.LayoutParams(0, dp(72), 1f).apply {
+            marginEnd = dp(8)
+        })
         colorLayout.addView(blackWhiteButton, LinearLayout.LayoutParams(0, dp(72), 1f))
         layout.addView(createTitle("Color Mode"))
         layout.addView(colorLayout)
@@ -1554,7 +1552,9 @@ class MainActivity : ComponentActivity() {
                 captureSettings.orientation = OrientationMode.LANDSCAPE
                 showColorModeScreen()
             }
-            orientationLayout.addView(portraitButton, LinearLayout.LayoutParams(0, dp(72), 1f))
+            orientationLayout.addView(portraitButton, LinearLayout.LayoutParams(0, dp(72), 1f).apply {
+                marginEnd = dp(8)
+            })
             orientationLayout.addView(landscapeButton, LinearLayout.LayoutParams(0, dp(72), 1f))
             layout.addView(createTitle("Orientation"))
             layout.addView(orientationLayout)
@@ -1580,7 +1580,13 @@ class MainActivity : ComponentActivity() {
                 showDocumentSizeScreen()
             }
         })
-        setContentView(layout)
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(layout, ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+        })
     }
 
     private fun createSelectionButton(
@@ -1598,6 +1604,9 @@ class MainActivity : ComponentActivity() {
                 textSize = 16f
 
                 isAllCaps = false
+                minHeight = dp(72)
+                minimumHeight = dp(72)
+                setPadding(dp(8), dp(6), dp(8), dp(6))
                 gravity = android.view.Gravity.CENTER
                 setCompoundDrawablePadding(dp(8))
                 val icon = getDrawable(iconRes)?.mutate()
@@ -1852,6 +1861,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun createOutlinedButton(
+        textValue: String,
+        onClick: () -> Unit
+    ): Button {
+        return createButton(textValue, onClick).apply {
+            setTextColor(paper)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), signal)
+            }
+            compoundDrawables.forEach { drawable ->
+                drawable?.setTint(paper)
+            }
+        }
+    }
+
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
@@ -1865,8 +1891,10 @@ class MainActivity : ComponentActivity() {
             textValue == "Next" -> android.R.drawable.ic_media_next
             textValue == "Zoom" -> android.R.drawable.ic_menu_zoom
             textValue == "Zoom In" -> android.R.drawable.ic_menu_zoom
+            textValue.contains("Rotate") -> android.R.drawable.ic_menu_rotate
             textValue == "+" -> android.R.drawable.ic_input_add
             textValue.contains("Gallery") -> android.R.drawable.ic_menu_gallery
+            textValue == "Add" -> android.R.drawable.ic_menu_add
             textValue.contains("Camera") -> android.R.drawable.ic_menu_camera
             textValue.contains("Crop") -> android.R.drawable.ic_menu_crop
             textValue.contains("Remove") -> android.R.drawable.ic_menu_delete

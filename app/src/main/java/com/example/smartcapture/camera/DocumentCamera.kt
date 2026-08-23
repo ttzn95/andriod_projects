@@ -1,6 +1,7 @@
 package com.example.smartcapture.camera
 
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -57,7 +58,18 @@ class DocumentCamera(
                 setBackgroundColor(
                     Color.BLACK
                 )
+                setPadding(
+                    0,
+                    (16 * activity.resources.displayMetrics.density).toInt(),
+                    0,
+                    0
+                )
             }
+
+        val density = activity.resources.displayMetrics.density
+        val margin = (16 * density).toInt()
+        val gap = (8 * density).toInt()
+        val controlHeight = (56 * density).toInt()
 
         val cameraArea =
             FrameLayout(activity).apply {
@@ -88,6 +100,11 @@ class DocumentCamera(
 
                 clipChildren = true
                 clipToPadding = true
+                background = GradientDrawable().apply {
+                    cornerRadius = 12 * density
+                    setColor(Color.BLACK)
+                }
+                clipToOutline = true
             }
 
         captureFrame.addView(
@@ -127,9 +144,9 @@ class DocumentCamera(
         )
 
         val frameParams =
-            LinearLayout.LayoutParams(
+            FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                ViewGroup.LayoutParams.MATCH_PARENT
             ).apply {
 
                 gravity =
@@ -196,20 +213,22 @@ class DocumentCamera(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1f
-            )
+            ).apply {
+                marginStart = margin
+                marginEnd = margin
+            }
         )
 
         if (captureSettings.captureType == CaptureType.PHOTO) {
             if (captureSettings.photoSide == null) {
                 captureSettings.photoSide = PhotoSide.FRONT
             }
-
             val sideLayout = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
             }
             val frontButton = activity.createCameraSelectionButton(
-                android.R.drawable.ic_menu_camera,
+                android.R.drawable.ic_menu_agenda,
                 "Front",
                 captureSettings.photoSide == PhotoSide.FRONT
             ) {
@@ -218,7 +237,7 @@ class DocumentCamera(
                 start()
             }
             val backButton = activity.createCameraSelectionButton(
-                android.R.drawable.ic_menu_camera,
+                android.R.drawable.ic_menu_agenda,
                 "Back",
                 captureSettings.photoSide == PhotoSide.BACK
             ) {
@@ -228,13 +247,24 @@ class DocumentCamera(
             }
             sideLayout.addView(
                 frontButton,
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                LinearLayout.LayoutParams(0, controlHeight, 1f).apply {
+                    marginStart = margin
+                    marginEnd = gap / 2
+                }
             )
             sideLayout.addView(
                 backButton,
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                LinearLayout.LayoutParams(0, controlHeight, 1f).apply {
+                    marginStart = gap / 2
+                    marginEnd = margin
+                }
             )
-            rootLayout.addView(sideLayout)
+            rootLayout.addView(sideLayout, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                controlHeight
+            ).apply {
+                topMargin = gap
+            })
         }
 
         val captureButton =
@@ -242,25 +272,23 @@ class DocumentCamera(
 
                 captureImage()
             }
+        captureButton.setTextColor(Color.WHITE)
+        captureButton.compoundDrawables.forEach { drawable -> drawable?.setTint(Color.WHITE) }
 
         rootLayout.addView(
             captureButton,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                controlHeight
             ).apply {
-
-                setMargins(
-                    50,
-                    10,
-                    50,
-                    5
-                )
+                marginStart = margin
+                topMargin = gap
+                marginEnd = margin
             }
         )
 
         val galleryButton =
-            activity.createCameraButton("Add from Gallery") {
+            activity.createOutlinedButton("Add from Gallery") {
                 stopCamera()
                 activity.openGalleryPicker(fromCamera = true)
             }
@@ -269,14 +297,16 @@ class DocumentCamera(
             galleryButton,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                controlHeight
             ).apply {
-                setMargins(50, 5, 50, 5)
+                marginStart = margin
+                topMargin = gap
+                marginEnd = margin
             }
         )
 
         val cancelButton =
-            activity.createCameraButton("Cancel") {
+            activity.createOutlinedButton("Cancel") {
 
                 stopCamera()
                 onCancelRequested()
@@ -286,15 +316,12 @@ class DocumentCamera(
             cancelButton,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                controlHeight
             ).apply {
-
-                setMargins(
-                    50,
-                    5,
-                    50,
-                    15
-                )
+                marginStart = margin
+                topMargin = gap
+                marginEnd = margin
+                bottomMargin = margin
             }
         )
 

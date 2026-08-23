@@ -1296,16 +1296,11 @@ class MainActivity : ComponentActivity() {
         onClick: () -> Unit
     ): Button {
 
-        return Button(this).apply {
-
-            text = textValue
-
-            isAllCaps = false
-
-            textSize = 16f
-
-            setOnClickListener {
-
+        return Button(this).apply { 
+            text = textValue 
+            isAllCaps = false 
+            textSize = 16f 
+            setOnClickListener { 
                 onClick()
             }
         }

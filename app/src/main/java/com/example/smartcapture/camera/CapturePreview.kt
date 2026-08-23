@@ -8,6 +8,8 @@ import android.app.AlertDialog
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.smartcapture.MainActivity
@@ -31,7 +33,9 @@ class CapturePreview(
             (12 * activity.resources.displayMetrics.density).toInt()
 
         val layout =
-            activity.createVerticalLayout()
+            activity.createVerticalLayout().apply {
+                setPadding(spacing + spacing / 3, spacing, spacing + spacing / 3, 0)
+            }
 
         layout.addView(
             activity.createTitle("Captured Image")
@@ -63,7 +67,6 @@ class CapturePreview(
 
                 minimumHeight = 0
 
-                setPadding(spacing, spacing, spacing, spacing)
                 background = GradientDrawable().apply {
                     cornerRadius = spacing.toFloat() * 1.5f
                     setColor(Color.rgb(27, 37, 44))
@@ -71,45 +74,64 @@ class CapturePreview(
                 }
             }
 
-        layout.addView(
-            imageView,
-            LinearLayout.LayoutParams(
+        val imageContainer = FrameLayout(activity).apply {
+            addView(imageView, FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            ).apply {
-                bottomMargin = spacing * 2
-            }
-        )
-
-        val controls = LinearLayout(activity).apply {
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+        }
+        val cropOverlay = CropOverlayView(activity).apply {
+            visibility = View.GONE
+        }
+        imageContainer.addView(cropOverlay, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+        layout.addView(imageContainer, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        ).apply {
+            bottomMargin = spacing * 2
+        })
+        val bottomControls = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, spacing / 2, 0, spacing)
+            setBackgroundColor(Color.rgb(245, 247, 246))
+            elevation = spacing.toFloat()
+        }
+        val reviewControlsLayout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val cropControlsLayout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
         }
 
-        fun iconButton(label: String, description: String, onClick: () -> Unit): Button {
+        fun toolbarButton(label: String, description: String, onClick: () -> Unit): Button {
             return activity.createButton(label, onClick).apply {
                 text = ""
                 contentDescription = description
+                minHeight = spacing * 4
+                minimumHeight = spacing * 4
+                setPadding(0, 0, 0, 0)
+                setTextColor(Color.rgb(27, 37, 44))
+                background = null
+                elevation = 0f
             }
         }
 
-        fun addThreeColumnRow(first: Button, second: Button, third: Button) {
-            val row = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER
+        fun addToolbarButton(toolbar: LinearLayout, button: Button) {
+            toolbar.addView(button, LinearLayout.LayoutParams(spacing * 4, spacing * 4).apply {
+                marginStart = spacing / 3
+                marginEnd = spacing / 3
+            })
+        }
+
+        fun secondaryButton(label: String, description: String, onClick: () -> Unit): Button {
+            return activity.createOutlinedButton(label, onClick).apply {
+                contentDescription = description
             }
-            listOf(first, second, third).forEachIndexed { index, button ->
-                row.addView(button, LinearLayout.LayoutParams(0, spacing * 3, 1f).apply {
-                    setMargins(
-                        if (index == 0) 0 else spacing / 3,
-                        0,
-                        if (index == 2) 0 else spacing / 3,
-                        spacing / 3
-                    )
-                })
-            }
-            controls.addView(row)
         }
 
         fun updateImage(file: File) {
@@ -118,19 +140,19 @@ class CapturePreview(
             imageView.resetZoom()
         }
 
-        val previousButton = iconButton("Previous", "Previous image") {
+        val previousButton = toolbarButton("Previous", "Previous image") {
             if (currentIndex > 0) {
                 currentIndex--
                 updateImage(currentFiles[currentIndex])
             }
         }
-        val nextButton = iconButton("Next", "Next image") {
+        val nextButton = toolbarButton("Next", "Next image") {
             if (currentIndex < currentFiles.lastIndex) {
                 currentIndex++
                 updateImage(currentFiles[currentIndex])
             }
         }
-        val removeButton = iconButton("Remove", "Remove image") {
+        val removeButton = toolbarButton("Remove", "Remove image") {
             if (currentFiles.size <= 1) {
                 AlertDialog.Builder(activity)
                     .setTitle("Cannot remove image")
@@ -146,11 +168,9 @@ class CapturePreview(
                 showImagePreview(currentFiles)
             }
         }
-        addThreeColumnRow(previousButton, nextButton, removeButton)
-
-        val zoomButton = iconButton("Zoom", "Zoom out") { imageView.zoomOut() }
-        val zoomInButton = iconButton("Zoom In", "Zoom in") { imageView.zoomIn() }
-        val resetButton = iconButton("Reset", "Restore original image") {
+        val zoomButton = toolbarButton("Zoom", "Zoom out") { imageView.zoomOut() }
+        val zoomInButton = toolbarButton("Zoom In", "Zoom in") { imageView.zoomIn() }
+        val resetButton = toolbarButton("Reset", "Restore original image") {
             val original = originalFiles[currentIndex]
             if (currentFile != original) {
                 activity.replaceCapturedImage(original, currentFile)
@@ -160,14 +180,16 @@ class CapturePreview(
                 imageView.resetZoom()
             }
         }
-        addThreeColumnRow(zoomButton, zoomInButton, resetButton)
+        val rotateButton = toolbarButton("Rotate", "Rotate image clockwise") {
+            imageView.rotateClockwise()
+        }
 
-        val cropButton = iconButton("Crop", "Crop image") {
-            val cropped = imageView.createVisibleCrop()
+        fun saveCroppedImage(cropped: Bitmap?) {
             if (cropped == null) {
                 showCaptureError("Unable to crop this image.")
-                return@iconButton
+                return
             }
+
             val croppedFile = File(
                 activity.cacheDir,
                 "capture_crop_${System.currentTimeMillis()}.jpg"
@@ -179,49 +201,110 @@ class CapturePreview(
             activity.replaceCapturedImage(croppedFile, currentFile)
             currentFiles[currentIndex] = croppedFile
             updateImage(croppedFile)
+            cropOverlay.visibility = View.GONE
+            cropControlsLayout.visibility = View.GONE
+            reviewControlsLayout.visibility = View.VISIBLE
         }
-        val addCameraButton = iconButton("+", "Add image from camera") {
+
+        val autoCropButton = toolbarButton("Auto Crop", "Auto crop the visible image area") {
+            saveCroppedImage(imageView.createVisibleCrop())
+        }
+        val manualCropButton = toolbarButton("Manual Crop", "Enter manual crop mode") {
+            cropOverlay.visibility = View.VISIBLE
+            cropOverlay.beginCrop()
+            reviewControlsLayout.visibility = View.GONE
+            cropControlsLayout.visibility = View.VISIBLE
+        }
+        val addCameraButton = toolbarButton("Add", "Add image from camera") {
             activity.startDocumentCamera()
         }
-        val backButton = iconButton("Back", "Back to settings") {
+        val toolbar = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        listOf(
+            previousButton,
+            nextButton,
+            removeButton,
+            zoomButton,
+            zoomInButton,
+            rotateButton,
+            resetButton,
+            autoCropButton,
+            manualCropButton,
+            addCameraButton
+        ).forEach { addToolbarButton(toolbar, it) }
+        reviewControlsLayout.addView(HorizontalScrollView(activity).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(toolbar, ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+        })
+
+        val freeformButton = secondaryButton("Freeform", "Freeform crop") {
+            cropOverlay.setMode(CropOverlayView.Mode.FREEFORM)
+        }
+        val squareButton = secondaryButton("Square", "Square crop") {
+            cropOverlay.setMode(CropOverlayView.Mode.SQUARE)
+        }
+        val cropModeRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(freeformButton, LinearLayout.LayoutParams(0, spacing * 3, 1f).apply {
+                marginEnd = spacing / 3
+            })
+            addView(squareButton, LinearLayout.LayoutParams(0, spacing * 3, 1f))
+        }
+        cropControlsLayout.addView(cropModeRow)
+        cropControlsLayout.addView(activity.createButton("APC") {
+            saveCroppedImage(imageView.createCrop(cropOverlay.selectedRect()))
+        })
+        cropControlsLayout.addView(secondaryButton("CC", "Cancel crop") {
+            cropOverlay.visibility = View.GONE
+            cropControlsLayout.visibility = View.GONE
+            reviewControlsLayout.visibility = View.VISIBLE
+        })
+        val backButton = secondaryButton("Back", "Back to settings") {
             activity.discardPageImages()
             activity.showColorModeScreen()
         }
-        addThreeColumnRow(cropButton, addCameraButton, backButton)
-
-        val homeButton = iconButton("Home", "Return home") {
+        val homeButton = secondaryButton("Home", "Return home") {
             activity.discardPageImages()
             activity.showAuthenticatedHome()
         }
-        val spacer = iconButton("", "") {}.apply {
-            visibility = View.INVISIBLE
-            isEnabled = false
+        val navigationRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
         }
-        val secondSpacer = iconButton("", "") {}.apply {
-            visibility = View.INVISIBLE
-            isEnabled = false
-        }
-        addThreeColumnRow(homeButton, spacer, secondSpacer)
+        navigationRow.addView(backButton, LinearLayout.LayoutParams(0, spacing * 4, 1f).apply {
+            marginEnd = spacing / 3
+        })
+        navigationRow.addView(homeButton, LinearLayout.LayoutParams(0, spacing * 4, 1f))
+        reviewControlsLayout.addView(navigationRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = spacing / 2
+        })
 
         // ---------------------------------------------------------
         // CONFIRM
         // ---------------------------------------------------------
 
-        controls.addView(
+        reviewControlsLayout.addView(
             activity.createButton("Confirm And Upload") {
                 activity.uploadCapturedImage()
             },
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, spacing * 4)
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, spacing * 4).apply {
+                topMargin = spacing * 2
+                marginStart = spacing + spacing / 3
+                marginEnd = spacing + spacing / 3
+            }
         )
-
-        layout.addView(
-            controls,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        )
+        bottomControls.addView(reviewControlsLayout)
+        bottomControls.addView(cropControlsLayout)
+        layout.addView(bottomControls, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
 
         activity.setContentView(layout)
     }

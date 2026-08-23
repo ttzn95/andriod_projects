@@ -1,0 +1,8 @@
+{
+  "name": "Android Projects",
+  "description": "Comprehensive Android projects showcase, project manager, and interactive Jetpack Compose component playground.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Android Projects</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_projects">Projects</string>
+    <string name="nav_playground">Playground</string>
+    <string name="nav_snippets">Snippets</string>
+</resources>

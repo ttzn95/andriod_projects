@@ -5,9 +5,12 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.util.TypedValue
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.material.button.MaterialButton
+import android.content.res.ColorStateList
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -19,6 +22,7 @@ import com.example.smartcapture.capture.CaptureSettings
 import com.example.smartcapture.capture.CaptureType
 import com.example.smartcapture.capture.OrientationMode 
 import com.example.smartcapture.capture.PhotoSide
+import com.example.smartcapture.R
 import android.widget.Button
 import com.example.smartcapture.MainActivity
 import java.io.File
@@ -70,6 +74,103 @@ class DocumentCamera(
         val margin = (16 * density).toInt()
         val gap = (8 * density).toInt()
         val controlHeight = (56 * density).toInt()
+        val compactControl = (48 * density).toInt()
+        val sideButtonHeight = ViewGroup.LayoutParams.WRAP_CONTENT
+
+        fun sideButton(title: String, selected: Boolean, onClick: () -> Unit): MaterialButton {
+            return MaterialButton(activity).apply {
+                text = title
+                icon = activity.getDrawable(R.drawable.ic_id_card)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_TOP
+                iconPadding = gap
+                isAllCaps = false
+                minHeight = compactControl
+                minimumHeight = compactControl
+                setPadding(gap, (12 * density).toInt(), gap, (12 * density).toInt())
+                gravity = Gravity.CENTER
+                setTextColor(if (selected) Color.BLACK else Color.WHITE)
+                iconTint = ColorStateList.valueOf(if (selected) Color.BLACK else Color.WHITE)
+                cornerRadius = (12 * density).toInt()
+                if (selected) {
+                    backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+                    strokeWidth = 0
+                } else {
+                    backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+                    strokeWidth = (1 * density).toInt()
+                    strokeColor = ColorStateList.valueOf(Color.WHITE)
+                }
+                setOnClickListener { onClick() }
+            }
+        }
+
+        fun cameraIconButton(
+            icon: Int,
+            description: String,
+            onClick: () -> Unit
+        ): Button {
+            return activity.createCameraButton(description, onClick).apply {
+                text = ""
+                contentDescription = description
+                setPadding(0, 0, 0, 0)
+                setTextColor(Color.WHITE)
+                elevation = 0f
+                setCompoundDrawablesWithIntrinsicBounds(icon, 0, 0, 0)
+                compoundDrawables.forEach { drawable -> drawable?.setTint(Color.WHITE) }
+                val backgroundValue = TypedValue()
+                activity.theme.resolveAttribute(
+                    android.R.attr.selectableItemBackgroundBorderless,
+                    backgroundValue,
+                    true
+                )
+                setBackgroundResource(backgroundValue.resourceId)
+            }
+        }
+
+        val sideLayout = if (captureSettings.captureType == CaptureType.PHOTO) {
+            if (captureSettings.photoSide == null) {
+                captureSettings.photoSide = PhotoSide.FRONT
+            }
+            LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(margin, 0, margin, 0)
+                val frontButton = sideButton(
+                    "Front",
+                    captureSettings.photoSide == PhotoSide.FRONT
+                ) {
+                    captureSettings.photoSide = PhotoSide.FRONT
+                    stopCamera()
+                    start()
+                }
+                val backButton = sideButton(
+                    "Back",
+                    captureSettings.photoSide == PhotoSide.BACK
+                ) {
+                    captureSettings.photoSide = PhotoSide.BACK
+                    stopCamera()
+                    start()
+                }
+                addView(frontButton, LinearLayout.LayoutParams(
+                    0,
+                    sideButtonHeight,
+                    1f
+                ))
+                addView(backButton, LinearLayout.LayoutParams(
+                    0,
+                    sideButtonHeight,
+                    1f
+                ))
+            }
+        } else {
+            null
+        }
+
+        sideLayout?.let {
+            rootLayout.addView(it, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+        }
 
         val cameraArea =
             FrameLayout(activity).apply {
@@ -180,12 +281,8 @@ class DocumentCamera(
                 gravity =
                     Gravity.CENTER
 
-                setPadding(
-                    20,
-                    10,
-                    20,
-                    10
-                )
+                setPadding(gap, gap, gap, gap)
+                setBackgroundColor(Color.argb(190, 0, 0, 0))
             }
 
         cameraArea.addView(
@@ -196,13 +293,13 @@ class DocumentCamera(
             ).apply {
 
                 gravity =
-                    Gravity.BOTTOM
+                    Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
 
                 setMargins(
+                    margin,
                     0,
-                    0,
-                    0,
-                    10
+                    margin,
+                    gap * 3
                 )
             }
         )
@@ -219,111 +316,56 @@ class DocumentCamera(
             }
         )
 
-        if (captureSettings.captureType == CaptureType.PHOTO) {
-            if (captureSettings.photoSide == null) {
-                captureSettings.photoSide = PhotoSide.FRONT
-            }
-            val sideLayout = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-            }
-            val frontButton = activity.createCameraSelectionButton(
-                android.R.drawable.ic_menu_agenda,
-                "Front",
-                captureSettings.photoSide == PhotoSide.FRONT
-            ) {
-                captureSettings.photoSide = PhotoSide.FRONT
-                stopCamera()
-                start()
-            }
-            val backButton = activity.createCameraSelectionButton(
-                android.R.drawable.ic_menu_agenda,
-                "Back",
-                captureSettings.photoSide == PhotoSide.BACK
-            ) {
-                captureSettings.photoSide = PhotoSide.BACK
-                stopCamera()
-                start()
-            }
-            sideLayout.addView(
-                frontButton,
-                LinearLayout.LayoutParams(0, controlHeight, 1f).apply {
-                    marginStart = margin
-                    marginEnd = gap / 2
-                }
-            )
-            sideLayout.addView(
-                backButton,
-                LinearLayout.LayoutParams(0, controlHeight, 1f).apply {
-                    marginStart = gap / 2
-                    marginEnd = margin
-                }
-            )
-            rootLayout.addView(sideLayout, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                controlHeight
-            ).apply {
-                topMargin = gap
-            })
-        }
-
-        val captureButton =
-            activity.createCameraButton("Capture") {
+        val captureButton = cameraIconButton(
+            android.R.drawable.ic_menu_camera,
+            "Capture",
+        ) {
 
                 captureImage()
             }
-        captureButton.setTextColor(Color.WHITE)
-        captureButton.compoundDrawables.forEach { drawable -> drawable?.setTint(Color.WHITE) }
+        captureButton.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.rgb(190, 35, 42))
+            setStroke((3 * density).toInt(), Color.WHITE)
+        }
 
-        rootLayout.addView(
-            captureButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                controlHeight
-            ).apply {
-                marginStart = margin
-                topMargin = gap
-                marginEnd = margin
-            }
-        )
-
-        val galleryButton =
-            activity.createOutlinedButton("Add from Gallery") {
+        val galleryButton = cameraIconButton(
+            android.R.drawable.ic_menu_gallery,
+            "Add from Gallery"
+        ) {
                 stopCamera()
                 activity.openGalleryPicker(fromCamera = true)
             }
-
-        rootLayout.addView(
-            galleryButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                controlHeight
-            ).apply {
-                marginStart = margin
-                topMargin = gap
-                marginEnd = margin
-            }
-        )
-
-        val cancelButton =
-            activity.createOutlinedButton("Cancel") {
+        val cancelButton = cameraIconButton(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            "Cancel"
+        ) {
 
                 stopCamera()
                 onCancelRequested()
             }
 
-        rootLayout.addView(
-            cancelButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                controlHeight
-            ).apply {
-                marginStart = margin
-                topMargin = gap
-                marginEnd = margin
-                bottomMargin = margin
-            }
-        )
+        val shutterRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(margin, gap, margin, margin)
+            addView(galleryButton, LinearLayout.LayoutParams(
+                (48 * density).toInt(),
+                (48 * density).toInt()
+            ))
+            addView(captureButton, LinearLayout.LayoutParams(compactControl * 2, compactControl * 2).apply {
+                marginStart = gap
+                marginEnd = gap
+            })
+            addView(cancelButton, LinearLayout.LayoutParams(
+                (48 * density).toInt(),
+                (48 * density).toInt()
+            ))
+        }
+        rootLayout.addView(shutterRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
 
         activity.setContentView(rootLayout)
 

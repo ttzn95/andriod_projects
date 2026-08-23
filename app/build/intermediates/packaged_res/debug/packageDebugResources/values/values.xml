@@ -8,7 +8,7 @@
     <color name="sc_paper">#FF17191C</color>
     <color name="sc_signal">#FFC62828</color>
     <color name="sc_system_bar">#FFF7F7F5</color>
-    <style name="Theme.SmartCapture" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.SmartCapture" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">@color/sc_system_bar</item>

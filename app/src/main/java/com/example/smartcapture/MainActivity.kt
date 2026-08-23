@@ -53,6 +53,11 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.button.MaterialButtonToggleGroup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -568,35 +573,31 @@ class MainActivity : ComponentActivity() {
             setPadding(0, dp(16), 0, dp(30))
         }
 
-        val staffIdInput =
-            EditText(this).apply {
+        val staffIdLayout = TextInputLayout(this).apply {
+            hint = "Staff ID"
+            isHintEnabled = true
+            isErrorEnabled = true
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxStrokeColor(outline)
+            addView(TextInputEditText(this@MainActivity).apply {
+                inputType = InputType.TYPE_CLASS_TEXT
+                setTextColor(paper)
+                setHintTextColor(muted)
+            })
+        }
+        val staffIdInput = staffIdLayout.editText!!
 
-                hint = "Staff ID"
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = dp(8)
-                }
-
-                inputType =
-                    InputType.TYPE_CLASS_TEXT
-            }
-
-        val passwordInput =
-            EditText(this).apply {
-
-                hint = "Password"
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(8)
-                }
-
-                inputType =
-                    InputType.TYPE_CLASS_TEXT or
-                            InputType.TYPE_TEXT_VARIATION_PASSWORD
+        val passwordLayout = TextInputLayout(this).apply {
+            hint = "Password"
+            isHintEnabled = true
+            isErrorEnabled = true
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxStrokeColor(outline)
+            addView(TextInputEditText(this@MainActivity).apply {
+                inputType = InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setTextColor(paper)
+                setHintTextColor(muted)
                 transformationMethod = PasswordTransformationMethod.getInstance()
 
                 setCompoundDrawablesWithIntrinsicBounds(
@@ -634,7 +635,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        setSelection(text.length)
+                        setSelection(text?.length ?: 0)
 
                         true
 
@@ -643,17 +644,15 @@ class MainActivity : ComponentActivity() {
                         false
                     }
                 }
-            }
-
-            styleInput(staffIdInput)
-            styleInput(passwordInput)
+            })
+        }
+        val passwordInput = passwordLayout.editText!!
 
         val loginStatus =
             TextView(this).apply {
-
                 textSize = 16f
                 setTextColor(muted)
-                setPadding(0, dp(20), 0, dp(20))
+                setPadding(0, dp(8), 0, dp(8))
             }
 
         val loginButton =
@@ -685,15 +684,13 @@ class MainActivity : ComponentActivity() {
                         passwordInput.text.toString()
 
                     if (staffId.isEmpty()) {
-
-                        showLoginError(loginStatus, "Please enter Staff ID.")
+                        staffIdLayout.error = "Please enter Staff ID."
 
                         return@setOnClickListener
                     }
 
                     if (password.isEmpty()) {
-
-                        showLoginError(loginStatus, "Please enter password.")
+                        passwordLayout.error = "Please enter password."
 
                         return@setOnClickListener
                     }
@@ -707,6 +704,8 @@ class MainActivity : ComponentActivity() {
                     login(
                         staffId,
                         password,
+                        staffIdLayout,
+                        passwordLayout,
                         loginStatus,
                         this
                     )
@@ -715,15 +714,15 @@ class MainActivity : ComponentActivity() {
 
         content.addView(title)
         content.addView(information)
-        content.addView(staffIdInput)
-        content.addView(passwordInput)
+        content.addView(staffIdLayout)
+        content.addView(passwordLayout)
         content.addView(loginStatus)
         content.addView(loginButton)
 
         if (secureCredentialStore.hasSavedCredentials()) {
             content.addView(
-                createButton("Use saved PIN") {
-                    showPinLoginDialog(loginStatus, loginButton)
+                createOutlinedButton("Use saved PIN") {
+                    showPinLoginDialog(staffIdLayout, passwordLayout, loginStatus, loginButton)
                 }
             )
         }
@@ -738,6 +737,8 @@ class MainActivity : ComponentActivity() {
     private fun login(
         staffId: String,
         password: String,
+        staffIdLayout: TextInputLayout,
+        passwordLayout: TextInputLayout,
         loginStatus: TextView,
         loginButton: Button
     ) {
@@ -746,7 +747,7 @@ class MainActivity : ComponentActivity() {
 
         if (token.isNullOrBlank()) {
 
-            showLoginError(loginStatus, "Session is missing. Please scan the QR again.")
+            showLoginError(staffIdLayout, passwordLayout, "Session is missing. Please scan the QR again.")
 
             loginButton.isEnabled = true
 
@@ -790,7 +791,7 @@ class MainActivity : ComponentActivity() {
 
                         } else {
 
-                            showLoginError(loginStatus, "Authentication failed. Please try again.")
+                            showLoginError(staffIdLayout, passwordLayout, "Authentication failed. Please try again.")
                         }
 
                     } else {
@@ -804,17 +805,18 @@ class MainActivity : ComponentActivity() {
                                     handleInvalidSession()
                                 } else {
                                     showLoginError(
-                                        loginStatus,
+                                        staffIdLayout,
+                                        passwordLayout,
                                         detail ?: "Authentication failed. Please try again."
                                     )
                                 }
                             }
 
                             403 ->
-                                showLoginError(loginStatus, "Staff is not authorized.")
+                                showLoginError(staffIdLayout, passwordLayout, "Staff is not authorized.")
 
                             else ->
-                                showLoginError(loginStatus, "Server error: ${response.code()}")
+                                showLoginError(staffIdLayout, passwordLayout, "Server error: ${response.code()}")
                         }
                     }
                 }
@@ -825,7 +827,7 @@ class MainActivity : ComponentActivity() {
 
                     loginButton.isEnabled = true
 
-                    showLoginError(loginStatus, "Unable to connect to server.")
+                    showLoginError(staffIdLayout, passwordLayout, "Unable to connect to server.")
                 }
             }
         }
@@ -867,7 +869,7 @@ class MainActivity : ComponentActivity() {
             showCaptureTypeScreen()
         }
 
-        val logoutButton = createButton("Logout") {
+        val logoutButton = createOutlinedButton("Logout") {
             logout()
         }
 
@@ -1174,9 +1176,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun showLoginError(status: TextView, message: String) {
-        status.setTextColor(errorColor)
-        status.text = message
+    private fun showLoginError(
+        staffIdLayout: TextInputLayout,
+        passwordLayout: TextInputLayout,
+        message: String
+    ) {
+        staffIdLayout.error = message
+        passwordLayout.error = null
     }
 
     private fun offerPinSetup(staffId: String, password: String) {
@@ -1205,7 +1211,12 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    private fun showPinLoginDialog(loginStatus: TextView, loginButton: Button) {
+    private fun showPinLoginDialog(
+        staffIdLayout: TextInputLayout,
+        passwordLayout: TextInputLayout,
+        loginStatus: TextView,
+        loginButton: Button
+    ) {
         val pinInput = EditText(this).apply {
             hint = "6-digit PIN"
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -1230,7 +1241,14 @@ class MainActivity : ComponentActivity() {
                 loginStatus.text = "Authenticating..."
                 loginStatus.setTextColor(muted)
                 loginButton.isEnabled = false
-                login(credentials.staffId, credentials.password, loginStatus, loginButton)
+                login(
+                    credentials.staffId,
+                    credentials.password,
+                    staffIdLayout,
+                    passwordLayout,
+                    loginStatus,
+                    loginButton
+                )
             }
         }
         dialog.show()
@@ -1287,39 +1305,41 @@ class MainActivity : ComponentActivity() {
     // CAPTURE TYPE
     // ---------------------------------------------------------
     private fun showCaptureTypeScreen() {
-
-        val layout = createVerticalLayout()
-
-        val title =
-            createTitle("Select Capture Type")
-
-        layout.addView(title)
-
-        val photoButton =
-            createButton("Photos") { 
-                captureSettings.captureType =    CaptureType.PHOTO
-                clearPageImages() 
-                showPhotoTypeScreen()
-            }
-
-        val documentButton =
-            createButton("Documents") { 
-                captureSettings.captureType =    CaptureType.DOCUMENT
-                clearPageImages()  
-                showDocumentSizeScreen()
-            }
-
-        val backButton =
-            createButton("Back") {
-
-                showReadyScreen("Staff")
-            }
-
-        layout.addView(photoButton)
-        layout.addView(documentButton)
-        layout.addView(backButton)
-
-        setContentView(layout)
+        val content = createVerticalLayout()
+        content.addView(createTitle("Select Capture Type"))
+        addSelectionCard(content, createSelectionCard(
+            android.R.drawable.ic_menu_gallery,
+            "Photos"
+        ) {
+            captureSettings.captureType = CaptureType.PHOTO
+            clearPageImages()
+            showPhotoTypeScreen()
+        })
+        addSelectionCard(content, createSelectionCard(
+            android.R.drawable.ic_menu_agenda,
+            "Documents"
+        ) {
+            captureSettings.captureType = CaptureType.DOCUMENT
+            clearPageImages()
+            showDocumentSizeScreen()
+        })
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ink)
+            addView(ScrollView(this@MainActivity).apply {
+                isFillViewport = true
+                addView(content)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ))
+        }
+        addBottomNavigation(root, "Back", { showReadyScreen("Staff") }, "Continue", {
+            if (captureSettings.captureType == CaptureType.PHOTO) showPhotoTypeScreen()
+            else if (captureSettings.captureType == CaptureType.DOCUMENT) showDocumentSizeScreen()
+        })
+        setContentView(root)
     }
 
     fun showAuthenticatedHome() {
@@ -1334,9 +1354,9 @@ class MainActivity : ComponentActivity() {
 
     private fun showPhotoTypeScreen() {
 
-        val layout = createVerticalLayout()
+        val content = createVerticalLayout()
 
-        layout.addView(
+        content.addView(
             createTitle("Photo Type")
         )
 
@@ -1350,25 +1370,38 @@ class MainActivity : ComponentActivity() {
 
         for ((displayName, photoType) in types) {
 
-            layout.addView(
-                createButton(displayName) {
+            addSelectionCard(content, createSelectionCard(
+                when (photoType) {
+                    PhotoType.LICENSE -> android.R.drawable.ic_menu_mylocation
+                    PhotoType.NRC -> android.R.drawable.ic_menu_agenda
+                    else -> android.R.drawable.ic_menu_gallery
+                },
+                displayName
+            ) {
 
                     captureSettings.photoType = photoType
                     captureSettings.photoSide = PhotoSide.FRONT
 
                     showColorModeScreen()
-                }
-            )
+                })
         }
 
-        layout.addView(
-            createButton("Back") {
-
-                showCaptureTypeScreen()
-            }
-        )
-
-        setContentView(layout)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ink)
+            addView(ScrollView(this@MainActivity).apply {
+                isFillViewport = true
+                addView(content)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ))
+        }
+        addBottomNavigation(root, "Back", { showCaptureTypeScreen() }, "Continue", {
+            if (captureSettings.photoType != null) showColorModeScreen()
+        })
+        setContentView(root)
     }
 
     // ---------------------------------------------------------
@@ -1376,9 +1409,9 @@ class MainActivity : ComponentActivity() {
     // ---------------------------------------------------------
     private fun showDocumentSizeScreen() {
 
-        val layout = createVerticalLayout()
+        val content = createVerticalLayout()
 
-        layout.addView(
+        content.addView(
             createTitle("Document Size")
         )
 
@@ -1396,8 +1429,10 @@ class MainActivity : ComponentActivity() {
 
         for ((displayName, documentSize) in sizes) {
 
-            layout.addView(
-                createButton(displayName) {
+            addSelectionCard(content, createSelectionCard(
+                android.R.drawable.ic_menu_agenda,
+                displayName
+            ) {
 
                     captureSettings.documentSize = documentSize
 
@@ -1409,18 +1444,25 @@ class MainActivity : ComponentActivity() {
 
                         showColorModeScreen()
                     }
-                }
-            )
+                })
         }
 
-        layout.addView(
-            createButton("Back") {
-
-                showCaptureTypeScreen()
-            }
-        )
-
-        setContentView(layout)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ink)
+            addView(ScrollView(this@MainActivity).apply {
+                isFillViewport = true
+                addView(content)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ))
+        }
+        addBottomNavigation(root, "Back", { showCaptureTypeScreen() }, "Continue", {
+            if (captureSettings.documentSize != null) showColorModeScreen()
+        })
+        setContentView(root)
     }
 
 
@@ -1506,31 +1548,38 @@ class MainActivity : ComponentActivity() {
 
         layout.addView(createTitle("Capture Settings"))
 
-        val colorLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        val colorButton = createSelectionButton(
-            android.R.drawable.ic_menu_gallery,
-            "Color",
-            captureSettings.colorMode == ColorMode.COLOR
-        ) {
-            captureSettings.colorMode = ColorMode.COLOR
-            showColorModeScreen()
-        }
-        val blackWhiteButton = createSelectionButton(
-            android.R.drawable.ic_menu_view,
-            "Black & White",
-            captureSettings.colorMode == ColorMode.BLACK_WHITE
-        ) {
-            captureSettings.colorMode = ColorMode.BLACK_WHITE
-            showColorModeScreen()
-        }
-        colorLayout.addView(colorButton, LinearLayout.LayoutParams(0, dp(72), 1f).apply {
-            marginEnd = dp(8)
-        })
-        colorLayout.addView(blackWhiteButton, LinearLayout.LayoutParams(0, dp(72), 1f))
         layout.addView(createTitle("Color Mode"))
-        layout.addView(colorLayout)
+        val colorToggleGroup = MaterialButtonToggleGroup(this).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            addView(MaterialButton(this@MainActivity).apply {
+                id = View.generateViewId()
+                text = "Color"
+                isAllCaps = false
+            }, LinearLayout.LayoutParams(0, dp(56), 1f))
+            addView(MaterialButton(this@MainActivity).apply {
+                id = View.generateViewId()
+                text = "Black & White"
+                isAllCaps = false
+            }, LinearLayout.LayoutParams(0, dp(56), 1f))
+            check(
+                if (captureSettings.colorMode == ColorMode.COLOR) getChildAt(0).id
+                else getChildAt(1).id
+            )
+            addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) {
+                    captureSettings.colorMode = if (checkedId == getChildAt(0).id) {
+                        ColorMode.COLOR
+                    } else {
+                        ColorMode.BLACK_WHITE
+                    }
+                }
+            }
+        }
+        layout.addView(colorToggleGroup, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
 
         if (captureSettings.captureType == CaptureType.DOCUMENT) {
             val orientationLayout = LinearLayout(this).apply {
@@ -1738,8 +1787,11 @@ class MainActivity : ComponentActivity() {
                 },
 
                 onCancelRequested = {
-
-                    showColorModeScreen()
+                    if (pageImages.isEmpty()) {
+                        showColorModeScreen()
+                    } else {
+                        capturePreview.showImagePreview(pageImages.map { it.file })
+                    }
                 }
             )
 
@@ -1876,6 +1928,85 @@ class MainActivity : ComponentActivity() {
                 drawable?.setTint(paper)
             }
         }
+    }
+
+    private fun createSelectionCard(
+        iconRes: Int,
+        title: String,
+        onClick: () -> Unit
+    ): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            radius = dp(12).toFloat()
+            cardElevation = dp(2).toFloat()
+            setCardBackgroundColor(Color.WHITE)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        content.addView(ImageView(this).apply {
+            setImageResource(iconRes)
+            setColorFilter(ink)
+            contentDescription = title
+        }, LinearLayout.LayoutParams(dp(32), dp(32)))
+        content.addView(TextView(this).apply {
+            text = title
+            textSize = 17f
+            setTextColor(ink)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            marginStart = dp(16)
+        })
+        card.addView(content)
+        return card
+    }
+
+    private fun addSelectionCard(
+        content: LinearLayout,
+        card: MaterialCardView
+    ) {
+        content.addView(card, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(12)
+        })
+    }
+
+    private fun addBottomNavigation(
+        root: LinearLayout,
+        backText: String,
+        onBack: () -> Unit,
+        continueText: String,
+        onContinue: () -> Unit
+    ) {
+        val navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        navigation.addView(createOutlinedButton(backText, onBack), LinearLayout.LayoutParams(
+            0,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            1f
+        ).apply {
+            marginEnd = dp(6)
+        })
+        navigation.addView(createButton(continueText, onContinue), LinearLayout.LayoutParams(
+            0,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            1f
+        ).apply {
+            marginStart = dp(6)
+        })
+        root.addView(navigation, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(8)
+        })
     }
 
     private fun dp(value: Int): Int =

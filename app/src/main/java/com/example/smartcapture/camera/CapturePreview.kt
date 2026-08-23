@@ -13,6 +13,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.smartcapture.MainActivity
+import com.example.smartcapture.R
 import java.io.File
 import java.io.FileOutputStream
 
@@ -243,26 +244,53 @@ class CapturePreview(
 
         val freeformButton = secondaryButton("Freeform", "Freeform crop") {
             cropOverlay.setMode(CropOverlayView.Mode.FREEFORM)
+        }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
         }
         val squareButton = secondaryButton("Square", "Square crop") {
             cropOverlay.setMode(CropOverlayView.Mode.SQUARE)
+        }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
         }
+        val cropButtonHeight = (56 * activity.resources.displayMetrics.density).toInt()
+        fun cropButtonParams() = LinearLayout.LayoutParams(0, cropButtonHeight, 1f)
         val cropModeRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(freeformButton, LinearLayout.LayoutParams(0, spacing * 3, 1f).apply {
+            addView(freeformButton, cropButtonParams().apply {
                 marginEnd = spacing / 3
             })
-            addView(squareButton, LinearLayout.LayoutParams(0, spacing * 3, 1f))
+            addView(squareButton, cropButtonParams())
         }
-        cropControlsLayout.addView(cropModeRow)
-        cropControlsLayout.addView(activity.createButton("APC") {
-            saveCroppedImage(imageView.createCrop(cropOverlay.selectedRect()))
+        cropControlsLayout.addView(cropModeRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = activity.resources.displayMetrics.density.times(12).toInt()
         })
-        cropControlsLayout.addView(secondaryButton("CC", "Cancel crop") {
+        val applyCropButton = activity.createButton("Apply") {
+            saveCroppedImage(imageView.createCrop(cropOverlay.selectedRect()))
+        }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_check, 0, 0, 0)
+            setTextColor(Color.WHITE)
+            compoundDrawables.forEach { drawable -> drawable?.setTint(Color.WHITE) }
+        }
+        val cancelCropButton = secondaryButton("Cancel", "Cancel crop") {
             cropOverlay.visibility = View.GONE
             cropControlsLayout.visibility = View.GONE
             reviewControlsLayout.visibility = View.VISIBLE
-        })
+        }.apply {
+            setTextColor(Color.rgb(27, 37, 44))
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_close, 0, 0, 0)
+            compoundDrawables.forEach { drawable -> drawable?.setTint(Color.rgb(27, 37, 44)) }
+        }
+        val cropActionRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(cancelCropButton, cropButtonParams().apply {
+                marginEnd = spacing / 3
+            })
+            addView(applyCropButton, cropButtonParams())
+        }
+        cropControlsLayout.addView(cropActionRow)
         val backButton = secondaryButton("Back", "Back to settings") {
             activity.discardPageImages()
             activity.showColorModeScreen()

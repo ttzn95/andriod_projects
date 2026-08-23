@@ -8,6 +8,9 @@ color sc_panel
 color sc_paper
 color sc_signal
 color sc_system_bar
+drawable ic_check
+drawable ic_close
+drawable ic_id_card
 drawable ic_visibility
 drawable ic_visibility_off
 style Theme.SmartCapture

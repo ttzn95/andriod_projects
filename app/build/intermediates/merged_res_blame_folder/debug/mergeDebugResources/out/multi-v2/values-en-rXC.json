@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.smartcapture.app-mergeDebugResources-35:/values-en-rXC/values-en-rXC.xml",
+            "outputFile": "com.example.smartcapture.app-mergeDebugResources-43:/values-en-rXC/values-en-rXC.xml",
             "map": [
                 {
                     "source": "/home/codespace/.gradle/caches/8.11.1/transforms/0b37b9eace45cf7e79d5723afd78e77a/transformed/appcompat-1.6.1/res/values-en-rXC/values-en-rXC.xml",

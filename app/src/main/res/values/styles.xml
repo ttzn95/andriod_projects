@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.SmartCapture" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.SmartCapture" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">@color/sc_system_bar</item>

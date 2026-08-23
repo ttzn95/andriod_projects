@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.smartcapture.app-mergeDebugResources-35:/values-en-rAU/values-en-rAU.xml",
+            "outputFile": "com.example.smartcapture.app-mergeDebugResources-43:/values-en-rAU/values-en-rAU.xml",
             "map": [
                 {
                     "source": "/home/codespace/.gradle/caches/8.11.1/transforms/17e03cee94892c9041451db52acee6de/transformed/core-1.13.0/res/values-en-rAU/values-en-rAU.xml",

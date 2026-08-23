@@ -1,10 +1,22 @@
 [
     {
-        "merged": "com.example.smartcapture.app-debug-37:/drawable_ic_visibility_off.xml.flat",
-        "source": "com.example.smartcapture.app-main-39:/drawable/ic_visibility_off.xml"
+        "merged": "com.example.smartcapture.app-debug-45:/drawable_ic_check.xml.flat",
+        "source": "com.example.smartcapture.app-main-47:/drawable/ic_check.xml"
     },
     {
-        "merged": "com.example.smartcapture.app-debug-37:/drawable_ic_visibility.xml.flat",
-        "source": "com.example.smartcapture.app-main-39:/drawable/ic_visibility.xml"
+        "merged": "com.example.smartcapture.app-debug-45:/drawable_ic_visibility_off.xml.flat",
+        "source": "com.example.smartcapture.app-main-47:/drawable/ic_visibility_off.xml"
+    },
+    {
+        "merged": "com.example.smartcapture.app-debug-45:/drawable_ic_visibility.xml.flat",
+        "source": "com.example.smartcapture.app-main-47:/drawable/ic_visibility.xml"
+    },
+    {
+        "merged": "com.example.smartcapture.app-debug-45:/drawable_ic_close.xml.flat",
+        "source": "com.example.smartcapture.app-main-47:/drawable/ic_close.xml"
+    },
+    {
+        "merged": "com.example.smartcapture.app-debug-45:/drawable_ic_id_card.xml.flat",
+        "source": "com.example.smartcapture.app-main-47:/drawable/ic_id_card.xml"
     }
 ]

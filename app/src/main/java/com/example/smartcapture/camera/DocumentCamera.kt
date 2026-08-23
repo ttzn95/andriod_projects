@@ -41,6 +41,7 @@ class DocumentCamera(
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var isActive = false
+    private var captureInProgress = false
 
     fun start() {
 
@@ -219,6 +220,22 @@ class DocumentCamera(
             }
         )
 
+        val galleryButton =
+            activity.createCameraButton("Add from Gallery") {
+                stopCamera()
+                activity.openGalleryPicker(fromCamera = true)
+            }
+
+        rootLayout.addView(
+            galleryButton,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(50, 5, 50, 5)
+            }
+        )
+
         val cancelButton =
             activity.createCameraButton("Cancel") {
 
@@ -310,12 +327,39 @@ class DocumentCamera(
     }
 
     private fun getCaptureAspectRatio(): Float {
-        val landscape = captureSettings.orientation == OrientationMode.LANDSCAPE
+        val width: Float
+        val height: Float
 
-        return if (captureSettings.captureType == CaptureType.PHOTO) {
-            if (landscape) 4f / 3f else 3f / 4f
+        if (captureSettings.captureType == CaptureType.PHOTO) {
+            width = 85.60f
+            height = 53.98f
         } else {
-            if (landscape) 16f / 9f else 9f / 16f
+            width = captureSettings.documentSize?.widthMm?.toFloat() ?: 210f
+            height = captureSettings.documentSize?.heightMm?.toFloat() ?: 297f
+        }
+
+        val customWidth = captureSettings.customDocumentWidthMm
+        val customHeight = captureSettings.customDocumentHeightMm
+        val selectedWidth = if (captureSettings.documentSize == com.example.smartcapture.capture.DocumentSize.CUSTOM) {
+            customWidth ?: width
+        } else {
+            width
+        }
+        val selectedHeight = if (captureSettings.documentSize == com.example.smartcapture.capture.DocumentSize.CUSTOM) {
+            customHeight ?: height
+        } else {
+            height
+        }
+
+        val ratio = if (selectedWidth > 0f && selectedHeight > 0f) {
+            selectedWidth / selectedHeight
+        } else {
+            210f / 297f
+        }
+        return if (captureSettings.orientation == OrientationMode.LANDSCAPE) {
+            ratio
+        } else {
+            1f / ratio
         }
     }
 
@@ -345,9 +389,15 @@ class DocumentCamera(
     }
 
     private fun captureImage() { 
+        if (captureInProgress) return
+
         val capture =
-            imageCapture
-                ?: return
+            imageCapture ?: run {
+                onCaptureError("Camera is not ready. Please try again.")
+                return
+            }
+
+        captureInProgress = true
 
         val file =
             File(
@@ -360,50 +410,74 @@ class DocumentCamera(
                 .Builder(file)
                 .build()
 
-        capture.takePicture(
-            outputOptions,
-            ContextCompat.getMainExecutor(activity),
-            object : ImageCapture.OnImageSavedCallback {
+        try {
+            capture.takePicture(
+                outputOptions,
+                ContextCompat.getMainExecutor(activity),
+                object : ImageCapture.OnImageSavedCallback {
 
-                override fun onImageSaved(
-                    outputFileResults:
-                        ImageCapture.OutputFileResults
-                ) {
+                    override fun onImageSaved(
+                        outputFileResults:
+                            ImageCapture.OutputFileResults
+                    ) {
 
-                    stopCamera()
-                    if (captureSettings.colorMode == com.example.smartcapture.capture.ColorMode.BLACK_WHITE) {
-                        val processedFile = File(
-                            activity.cacheDir,
-                            "capture_bw_${System.currentTimeMillis()}.jpg"
-                        )
-                        CoroutineScope(Dispatchers.Default).launch {
-                            val converted = ImageProcessor.convertToBlackAndWhite(file, processedFile)
-                            withContext(Dispatchers.Main) {
-                                if (converted) {
-                                    file.delete()
-                                    onImageCaptured(processedFile)
-                                } else {
-                                    processedFile.delete()
-                                    onImageCaptured(file)
+                        stopCamera()
+                        if (captureSettings.colorMode == com.example.smartcapture.capture.ColorMode.BLACK_WHITE) {
+                            val processedFile = File(
+                                activity.cacheDir,
+                                "capture_bw_${System.currentTimeMillis()}.jpg"
+                            )
+                            CoroutineScope(Dispatchers.Default).launch {
+                                val converted = try {
+                                    ImageProcessor.convertToBlackAndWhite(file, processedFile)
+                                } catch (_: Exception) {
+                                    false
+                                }
+                                withContext(Dispatchers.Main) {
+                                    captureInProgress = false
+                                    if (converted) {
+                                        file.delete()
+                                        deliverCapturedImage(processedFile)
+                                    } else {
+                                        processedFile.delete()
+                                        file.delete()
+                                        onCaptureError("Unable to process captured image")
+                                    }
                                 }
                             }
+                        } else {
+                            captureInProgress = false
+                            deliverCapturedImage(file)
                         }
-                    } else {
-                        onImageCaptured(file)
+                    }
+
+                    override fun onError(
+                        exception: ImageCaptureException
+                    ) {
+
+                        captureInProgress = false
+                        file.delete()
+                        onCaptureError(
+                            exception.message
+                                ?: "Unable to capture image"
+                        )
                     }
                 }
+            )
+        } catch (exception: Exception) {
+            captureInProgress = false
+            file.delete()
+            onCaptureError(exception.message ?: "Unable to capture image")
+        }
+    }
 
-                override fun onError(
-                    exception: ImageCaptureException
-                ) {
-
-                    onCaptureError(
-                        exception.message
-                            ?: "Unable to capture image"
-                    )
-                }
-            }
-        )
+    private fun deliverCapturedImage(file: File) {
+        try {
+            onImageCaptured(file)
+        } catch (exception: Exception) {
+            file.delete()
+            onCaptureError(exception.message ?: "Unable to open captured image")
+        }
     }
 
     fun stopCamera() {

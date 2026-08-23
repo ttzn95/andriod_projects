@@ -1,9 +1,5 @@
 package com.example.smartcapture
 
-import okhttp3.MultipartBody
-import okhttp3.MediaType
-import okhttp3.RequestBody
-import retrofit2.Retrofit
 import com.example.smartcapture.camera.CapturePreview
 import com.example.smartcapture.camera.DocumentCamera
 import com.example.smartcapture.camera.PageImage
@@ -15,9 +11,6 @@ import com.example.smartcapture.capture.DocumentSize
 import com.example.smartcapture.capture.OrientationMode
 import com.example.smartcapture.capture.PhotoType
 import com.example.smartcapture.capture.PhotoSide
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Typeface
@@ -26,9 +19,8 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.os.Bundle
+import android.os.Build
 import android.text.InputType
 import android.text.method.HideReturnsTransformationMethod
 import android.text.method.PasswordTransformationMethod
@@ -56,6 +48,7 @@ import androidx.core.content.ContextCompat
 import com.example.smartcapture.api.ApiClient
 import com.example.smartcapture.api.LoginRequest
 import com.example.smartcapture.api.ApiError
+import com.example.smartcapture.api.CaptureUploadParts
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -95,11 +88,14 @@ class MainActivity : ComponentActivity() {
     private var captureSettings = CaptureSettings()
     private var capturedImageFile: File? = null
     private val pageImages = mutableListOf<PageImage>()
+    private val temporaryPageFiles = mutableSetOf<File>()
     private var lastCaptureId: String? = null
 
     private fun clearPageImages() {
         pageImages.forEach { it.file.delete() }
+        temporaryPageFiles.forEach { it.delete() }
         pageImages.clear()
+        temporaryPageFiles.clear()
         capturedImageFile = null
     }
 
@@ -124,6 +120,23 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             if (uris.isNotEmpty()) {
                 importGalleryImages(uris)
+            } else if (galleryOpenedFromCamera) {
+                galleryOpenedFromCamera = false
+                startDocumentCamera()
+            }
+        }
+
+    private var galleryOpenedFromCamera = false
+
+    private val galleryPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                galleryPicker.launch(arrayOf("image/*"))
+            } else if (galleryOpenedFromCamera) {
+                galleryOpenedFromCamera = false
+                startDocumentCamera()
+            } else {
+                showCaptureError("Gallery permission is required to select images.")
             }
         }
 
@@ -877,12 +890,35 @@ class MainActivity : ComponentActivity() {
             pageImages[index] = PageImage(file)
         }
         if (file != previousFile) {
-            previousFile.delete()
+            temporaryPageFiles.add(previousFile)
         }
     }
 
-    fun openGalleryPicker() {
-        galleryPicker.launch(arrayOf("image/*"))
+    fun removePageImage(file: File): List<File> {
+        if (pageImages.size <= 1) return pageImages.map { it.file }
+        pageImages.removeAll { it.file == file }
+        file.delete()
+        capturedImageFile = pageImages.lastOrNull()?.file
+        return pageImages.map { it.file }
+    }
+
+    fun discardPageImages() {
+        clearPageImages()
+    }
+
+    fun openGalleryPicker(fromCamera: Boolean = false) {
+        galleryOpenedFromCamera = fromCamera
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            galleryPicker.launch(arrayOf("image/*"))
+        } else {
+            galleryPermissionLauncher.launch(permission)
+        }
     }
 
     private fun appendCapturedImage(file: File) {
@@ -961,100 +997,54 @@ class MainActivity : ComponentActivity() {
 
         uploadInProgress = true
 
+        val uploadDimension = getRecommendedUploadDimension()
+
         CoroutineScope(Dispatchers.IO).launch {
+
+            var mergedFile: File? = null
+            var uploadTempFile: File? = null
 
             try {
 
-                val tokenBody =
-                    RequestBody.create(
-                        MediaType.parse("text/plain"),
-                        token
+                val uploadFiles = if (files.size > 1) {
+                    mergedFile = File(
+                        cacheDir,
+                        "page_${System.currentTimeMillis()}.jpg"
                     )
-                
-                val captureTypeBody =
-                    RequestBody.create(
-                        MediaType.parse("text/plain"),
-                        captureType
+                    if (!ImageProcessor.mergeVertically(files, mergedFile!!, uploadDimension)) {
+                        throw IllegalStateException("Unable to merge page images")
+                    }
+                    listOf(mergedFile!!)
+                } else {
+                    uploadTempFile = File(
+                        cacheDir,
+                        "upload_${System.currentTimeMillis()}.jpg"
                     )
-
-                val photoTypeBody =
-                    settings.photoType?.name?.let {
-                        RequestBody.create(
-                            MediaType.parse("text/plain"),
-                            it
-                        )
+                    if (!ImageProcessor.compressForUpload(files.first(), uploadTempFile!!, uploadDimension)) {
+                        throw IllegalStateException("Unable to prepare image for upload")
                     }
-
-                val photoSideBody =
-                    settings.photoSide?.name?.let {
-                        RequestBody.create(
-                            MediaType.parse("text/plain"),
-                            it
-                        )
-                    }
-
-                val documentSizeBody =
-                    settings.documentSize?.name?.let {
-                        RequestBody.create(
-                            MediaType.parse("text/plain"),
-                            it
-                        )
-                    }
-
-                val customWidthBody =
-                    settings.customDocumentWidthMm?.toString()?.let {
-                        RequestBody.create(
-                            MediaType.parse("text/plain"),
-                            it
-                        )
-                    }
-
-                val customHeightBody =
-                    settings.customDocumentHeightMm?.toString()?.let {
-                        RequestBody.create(
-                            MediaType.parse("text/plain"),
-                            it
-                        )
-                    }
-
-                val colorModeBody =
-                    RequestBody.create(
-                        MediaType.parse("text/plain"),
-                        settings.colorMode.name
-                    )
-
-                val orientationBody =
-                    RequestBody.create(
-                        MediaType.parse("text/plain"),
-                        settings.orientation.name
-                    )
-
-                val imageParts = files.map { file ->
-                    val mimeType = when (file.extension.lowercase()) {
-                        "jpg", "jpeg" -> "image/jpeg"
-                        "png" -> "image/png"
-                        "svg" -> "image/svg+xml"
-                        else -> "application/octet-stream"
-                    }
-                    MultipartBody.Part.createFormData(
-                        "images",
-                        file.name,
-                        RequestBody.create(MediaType.parse(mimeType), file)
-                    )
+                    listOf(uploadTempFile!!)
                 }
+
+                val uploadParts = CaptureUploadParts.create(
+                    token = token,
+                    captureType = captureType,
+                    settings = settings,
+                    files = uploadFiles
+                )
 
                 val response =
                     ApiClient.api.uploadCapture(
-                        captureToken = tokenBody,
-                        captureType = captureTypeBody,
-                        photoType = photoTypeBody,
-                        photoSide = photoSideBody,
-                        documentSize = documentSizeBody,
-                        customDocumentWidthMm = customWidthBody,
-                        customDocumentHeightMm = customHeightBody,
-                        colorMode = colorModeBody,
-                        orientation = orientationBody,
-                        images = imageParts
+                        captureToken = uploadParts.captureToken,
+                        captureType = uploadParts.captureType,
+                        photoType = uploadParts.photoType,
+                        photoSide = uploadParts.photoSide,
+                        documentSize = uploadParts.documentSize,
+                        customDocumentWidthMm = uploadParts.customDocumentWidthMm,
+                        customDocumentHeightMm = uploadParts.customDocumentHeightMm,
+                        colorMode = uploadParts.colorMode,
+                        orientation = uploadParts.orientation,
+                        images = uploadParts.images
                     )
 
                 withContext(Dispatchers.Main) {
@@ -1090,7 +1080,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                mergedFile?.delete()
+                uploadTempFile?.delete()
+
             } catch (e: Exception) {
+
+                mergedFile?.delete()
+                uploadTempFile?.delete()
 
                 withContext(Dispatchers.Main) {
 
@@ -1330,6 +1326,10 @@ class MainActivity : ComponentActivity() {
         setContentView(layout)
     }
 
+    fun showAuthenticatedHome() {
+        showReadyScreen("Staff")
+    }
+
 
 
     // ---------------------------------------------------------
@@ -1391,6 +1391,10 @@ class MainActivity : ComponentActivity() {
             "Legal" to DocumentSize.LEGAL,
             "A5" to DocumentSize.A5,
             "B5" to DocumentSize.B5,
+            "B5 JIS" to DocumentSize.B5_JIS,
+            "Letter" to DocumentSize.LETTER,
+            "A3" to DocumentSize.A3,
+            "A6" to DocumentSize.A6,
             "Custom Size" to DocumentSize.CUSTOM
         )
 
@@ -1816,6 +1820,25 @@ class MainActivity : ComponentActivity() {
         }
     } 
 
+    private fun getRecommendedUploadDimension(): Int {
+        if (captureSettings.captureType == CaptureType.PHOTO) {
+            return if (captureSettings.photoType == PhotoType.LICENSE) 1600 else 3000
+        }
+
+        return when (captureSettings.documentSize) {
+            DocumentSize.A5 -> 2000
+            DocumentSize.B5 -> 3100
+            DocumentSize.B5_JIS -> 3100
+            DocumentSize.A4 -> 3500
+            DocumentSize.LEGAL -> 4100
+            DocumentSize.LETTER -> 3000
+            DocumentSize.A3 -> 4200
+            DocumentSize.A6 -> 1600
+            DocumentSize.CUSTOM -> 3000
+            null -> 3000
+        }
+    }
+
     private fun getPhotoSideDisplayName(): String {
 
         return when (captureSettings.photoSide) {
@@ -1997,9 +2020,15 @@ class MainActivity : ComponentActivity() {
             textValue.contains("Login") -> android.R.drawable.ic_menu_send
             textValue.contains("Capture") -> android.R.drawable.ic_menu_camera
             textValue.contains("Confirm") -> android.R.drawable.ic_menu_upload
+            textValue == "Prev" -> android.R.drawable.ic_media_previous
+            textValue == "Next" -> android.R.drawable.ic_media_next
+            textValue == "Zoom" -> android.R.drawable.ic_menu_zoom
+            textValue == "Zoom In" -> android.R.drawable.ic_menu_zoom
+            textValue == "+" -> android.R.drawable.ic_input_add
             textValue.contains("Gallery") -> android.R.drawable.ic_menu_gallery
             textValue.contains("Camera") -> android.R.drawable.ic_menu_camera
             textValue.contains("Crop") -> android.R.drawable.ic_menu_crop
+            textValue.contains("Remove") -> android.R.drawable.ic_menu_delete
             textValue == "Previous" -> android.R.drawable.ic_media_previous
             textValue == "Next" -> android.R.drawable.ic_media_next
             textValue == "Reset" -> android.R.drawable.ic_popup_sync

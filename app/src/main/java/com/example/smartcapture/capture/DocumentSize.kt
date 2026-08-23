@@ -30,6 +30,30 @@ enum class DocumentSize(
         heightMm = 250
     ),
 
+    B5_JIS(
+        displayName = "B5 JIS",
+        widthMm = 182,
+        heightMm = 257
+    ),
+
+    LETTER(
+        displayName = "Letter",
+        widthMm = 216,
+        heightMm = 279
+    ),
+
+    A3(
+        displayName = "A3",
+        widthMm = 297,
+        heightMm = 420
+    ),
+
+    A6(
+        displayName = "A6",
+        widthMm = 105,
+        heightMm = 148
+    ),
+
     CUSTOM(
         displayName = "Custom",
         widthMm = null,
